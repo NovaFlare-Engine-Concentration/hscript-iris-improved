@@ -113,9 +113,9 @@ class Parser {
 	var ops: Array<Bool>;
 	var idents: Array<Bool>;
 	var uid: Int = 0;
-	var abductCount:Int = 0;
+	var abductCount: Int = 0;
 	var abducts = ["function", "if", "for", "while", "try", "switch"];
-	var sureStaticModifier:Bool = false;
+	var sureStaticModifier: Bool = false;
 
 	#if hscriptPos
 	var origin: String;
@@ -185,8 +185,10 @@ class Parser {
 	}
 
 	public inline function error(err, pmin, pmax) {
-		if(sureStaticModifier) sureStaticModifier = false;
-		if(abductCount > 0) abductCount = 0;
+		if (sureStaticModifier)
+			sureStaticModifier = false;
+		if (abductCount > 0)
+			abductCount = 0;
 
 		if (!resumeErrors)
 			#if hscriptPos
@@ -419,9 +421,11 @@ class Parser {
 		#end
 		switch (tk) {
 			case TId(id):
-				if(abducts.contains(id)) abductCount++;
+				if (abducts.contains(id))
+					abductCount++;
 				var e = parseStructure(id);
-				if(abducts.contains(id)) abductCount--;
+				if (abducts.contains(id))
+					abductCount--;
 				if (e == null)
 					e = mk(EIdent(id));
 				return parseExprNext(e);
@@ -498,10 +502,10 @@ class Parser {
 				}
 				var a = new Array();
 				abductCount++;
-				while( true ) {
+				while (true) {
 					parseFullExpr(a);
 					tk = token();
-					if( tk == TBrClose || (resumeErrors && tk == TEof) )
+					if (tk == TBrClose || (resumeErrors && tk == TEof))
 						break;
 					push(tk);
 				}
@@ -672,17 +676,17 @@ class Parser {
 				}
 				mk(EIf(cond, e1, e2), p1, (e2 == null) ? tokenMax : pmax(e2));
 			case "static":
-				if(abductCount == 0) {
+				if (abductCount == 0) {
 					var t = token();
-					switch(t) {
+					switch (t) {
 						case TId(byd):
-							if(byd == "var" || byd == "final" || byd == "function") {
+							if (byd == "var" || byd == "final" || byd == "function") {
 								sureStaticModifier = true;
 								var ret = parseStructure(byd);
 								sureStaticModifier = false;
 								return ret;
-							} else if(byd == "inline") {
-								if(!maybe(TId("function")))
+							} else if (byd == "inline") {
+								if (!maybe(TId("function")))
 									return unexpected(TId(byd));
 								sureStaticModifier = true;
 								var ret = parseStructure("function");
@@ -691,52 +695,58 @@ class Parser {
 							} else unexpected(TId(byd));
 						default: unexpected(TId(id));
 					}
-				} else error(ECustom('Cannot Set-up "$id" In Local.'), tokenMin, tokenMax);
+				} else
+					error(ECustom('Cannot Set-up "$id" In Local.'), tokenMin, tokenMax);
 				null;
 			case "var", "final":
-				var getter:String = "default";
-				var setter:String = "default";
+				var getter: String = "default";
+				var setter: String = "default";
 				var ident = getIdent();
 				var tk = token();
 				var t = null;
-				if(tk == TPOpen) {
-					if(abductCount == 0 && id == "var") {
-						var getter1:Null<String> = null;
-						var setter1:Null<String> = null;
-						var displayComma:Bool = false;
-						var closed:Bool = false;
-						while(true) {
+				if (tk == TPOpen) {
+					if (abductCount == 0 && id == "var") {
+						var getter1: Null<String> = null;
+						var setter1: Null<String> = null;
+						var displayComma: Bool = false;
+						var closed: Bool = false;
+						while (true) {
 							var t = token();
-							switch(t) {
+							switch (t) {
 								case TComma:
-									if(getter != null && !displayComma) {
+									if (getter != null && !displayComma) {
 										displayComma = true;
 									} else unexpected(t);
 								case TId(byd):
-									if(getter1 == null && !displayComma) {
-										if(byd == "get" || byd == "never" || byd == "default" || byd == "null") {
+									if (getter1 == null && !displayComma) {
+										if (byd == "get" || byd == "never" || byd == "default" || byd == "null") {
 											getter1 = byd;
-										} else unexpected(t);
-									} else if(setter1 == null && displayComma) {
-										if(byd == "set" || byd == "never" || byd == "default" || byd == "null") {
+										} else
+											unexpected(t);
+									} else if (setter1 == null && displayComma) {
+										if (byd == "set" || byd == "never" || byd == "default" || byd == "null") {
 											setter1 = byd;
-										} else unexpected(t);
+										} else
+											unexpected(t);
 									} else unexpected(t);
 								case TPClose:
-									if(getter1 != null && setter1 != null) closed = true;
-									else unexpected(t);
+									if (getter1 != null && setter1 != null) closed = true; else unexpected(t);
 								default:
 									unexpected(t);
 							}
 
-							if(closed) break;
+							if (closed)
+								break;
 						}
 
-						if(getter1 != null) getter = getter1;
-						if(setter1 != null) setter = setter1;
+						if (getter1 != null)
+							getter = getter1;
+						if (setter1 != null)
+							setter = setter1;
 
 						tk = token();
-					} else unexpected(tk);
+					} else
+						unexpected(tk);
 				}
 				if (tk == TDoubleDot && allowTypes) {
 					t = parseType();
@@ -747,7 +757,8 @@ class Parser {
 					e = parseExpr();
 				else
 					push(tk);
-				mk(EVar(ident, t, e, getter, setter, (id == "final"), if(abductCount == 0) sureStaticModifier else false), p1, (e == null) ? tokenMax : pmax(e));
+				mk(EVar(ident, t, e, getter, setter, (id == "final"), if (abductCount == 0) sureStaticModifier else false), p1,
+					(e == null) ? tokenMax : pmax(e));
 			case "while":
 				var econd = parseExpr();
 				var e = parseExpr();
@@ -774,15 +785,15 @@ class Parser {
 			case "else": unexpected(TId(id));
 			case "inline":
 				var t = token();
-				switch(t) {
+				switch (t) {
 					case TId(id):
-						if(id == "static") {
-							if(!sureStaticModifier && abductCount == 0) {
-								if(abductCount == 0) {
+						if (id == "static") {
+							if (!sureStaticModifier && abductCount == 0) {
+								if (abductCount == 0) {
 									var t = token();
-									switch(t) {
+									switch (t) {
 										case TId(byd):
-											if(byd == "function") {
+											if (byd == "function") {
 												sureStaticModifier = true;
 												var ret = parseStructure(byd);
 												sureStaticModifier = false;
@@ -790,13 +801,14 @@ class Parser {
 											} else unexpected(TId(id));
 										default: unexpected(TId(id));
 									}
-								} else error(ECustom('Cannot Set-up "$id" In Local.'), tokenMin, tokenMax);
+								} else
+									error(ECustom('Cannot Set-up "$id" In Local.'), tokenMin, tokenMax);
 								return null;
 							}
-						} else if(id == "function") {
+						} else if (id == "function") {
 							return parseStructure("function");
 						}
-					default: //nothing here
+					default: // nothing here
 				}
 				unexpected(t);
 			case "function":
@@ -807,7 +819,7 @@ class Parser {
 					default: push(tk);
 				}
 				var inf = parseFunctionDecl();
-				mk(EFunction(inf.args, inf.body, name, inf.ret, if(abductCount == 0) sureStaticModifier else false), p1, pmax(inf.body));
+				mk(EFunction(inf.args, inf.body, name, inf.ret, if (abductCount == 0) sureStaticModifier else false), p1, pmax(inf.body));
 			case "return":
 				var tk = token();
 				push(tk);

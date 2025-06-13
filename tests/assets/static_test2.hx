@@ -1,8 +1,8 @@
-static final fan:Int = 666;
-static var sad:String = "alive";
+static final fan: Int = 666;
+static var sad: String = "alive";
 
 function new() {
-	//reading
+	// reading
 	trace("static_test1 static var allbad: " + allBad);
 	var old = allRight;
 	allRight += " forever";

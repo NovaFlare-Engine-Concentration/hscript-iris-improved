@@ -2,7 +2,7 @@ static var allRight = "Come Heaven";
 static final allBad = "Go on The Hell";
 
 function new() {
-	//reading
+	// reading
 	trace("static_test2 static var fan: " + fan);
 	var old = sad;
 	sad += " forever";

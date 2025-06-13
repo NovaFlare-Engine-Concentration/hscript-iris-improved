@@ -20,11 +20,18 @@ class Main {
 		testIndenticalNames();
 		testUsing();
 		mainStatic();
+		mainProp();
+	}
+
+	static function mainProp() {
+		var sm1: Iris = new Iris(Resource.getString("assets/props_test.hx"));
+		sm1.call("new");
+		@:privateAccess trace('Script_Props_State: ${sm1.interp.props}, Script_Props_Links: ${sm1.interp.propertyLinks}');
 	}
 
 	static function mainStatic() {
-		var sm1:Iris = new Iris(Resource.getString("assets/static_test1.hx"));
-		var sm2:Iris = new Iris(Resource.getString("assets/static_test2.hx"));
+		var sm1: Iris = new Iris(Resource.getString("assets/static_test1.hx"));
+		var sm2: Iris = new Iris(Resource.getString("assets/static_test2.hx"));
 		sm1.call("new");
 		sm2.call("new");
 		trace("Static State: " + Interp.staticVariables);

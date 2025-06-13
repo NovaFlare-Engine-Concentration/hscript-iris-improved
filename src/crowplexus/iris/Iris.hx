@@ -290,8 +290,8 @@ class Iris {
 	**/
 	public function preset(): Void {
 		/*set("Std", Std);
-		set("StringTools", StringTools);
-		set("Math", Math);*/
+			set("StringTools", StringTools);
+			set("Math", Math); */
 		#if hscriptPos
 		// overriding trace for good measure.
 		// if you're a game developer or a fnf modder (hi guys),

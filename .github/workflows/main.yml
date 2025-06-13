@@ -14,10 +14,13 @@ jobs:
         with:
           haxe-version: 4.3.6
 
-      #忘加库了😅
       - name: Add Lib
         run: |
           haxelib install hxcpp --quiet
+          haxelib install formatter --quiet
+
+      - name: Fomatter Testing
+        run: ./reformat.sh
 
       - name: Testing
         run: |

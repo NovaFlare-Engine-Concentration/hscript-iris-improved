@@ -187,16 +187,19 @@ class Printer {
 			case EIdent(v):
 				add(v);
 			case EVar(n, t, e, gt, st, c, s):
-				if(gt == null) gt = "default";
-				if(st == null) st = "default";
+				if (gt == null)
+					gt = "default";
+				if (st == null)
+					st = "default";
 
-				if(s == true) add("static ");
+				if (s == true)
+					add("static ");
 				if (c) {
 					add("final " + n);
 				} else {
 					add("var " + n);
 				}
-				if(!c && (gt != "default" || st != "default")) {
+				if (!c && (gt != "default" || st != "default")) {
 					add("(");
 					add(gt + ", " + st);
 					add(")");
@@ -297,7 +300,8 @@ class Printer {
 			case EContinue:
 				add("continue");
 			case EFunction(params, e, name, ret, s):
-				if(s == true) add("static ");
+				if (s == true)
+					add("static ");
 				add("function");
 				if (name != null)
 					add(" " + name);
