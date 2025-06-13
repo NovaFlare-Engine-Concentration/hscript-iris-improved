@@ -70,7 +70,7 @@ class Main {
 		trace(Type.enumEq(test, test2));
 
 		/*var result = myScript.call("non existent function");
-		trace(result);*/
+			trace(result); */
 	}
 
 	/**
