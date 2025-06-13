@@ -431,7 +431,8 @@ class Parser {
 				}
 				var e = parseStructure(id);
 				if (abducts.contains(id)) {
-					while(compatibles.length > ttime) compatibles.pop();
+					while (compatibles.length > ttime)
+						compatibles.pop();
 					abductCount--;
 				}
 				if (e == null)
@@ -527,10 +528,13 @@ class Parser {
 				}
 				var a = new Array();
 				var doit: Bool = {
-					if(compatibles.length > 0) compatibles.pop();
-					else false;
+					if (compatibles.length > 0)
+						compatibles.pop();
+					else
+						false;
 				}
-				if(!doit) abductCount++;
+				if (!doit)
+					abductCount++;
 				while (true) {
 					parseFullExpr(a);
 					tk = token();
@@ -538,7 +542,8 @@ class Parser {
 						break;
 					push(tk);
 				}
-				if(!doit) abductCount--;
+				if (!doit)
+					abductCount--;
 				return mk(EBlock(a), p1);
 			case TOp(op):
 				if (op == "-") {

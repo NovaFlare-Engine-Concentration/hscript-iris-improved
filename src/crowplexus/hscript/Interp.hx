@@ -215,9 +215,9 @@ class Interp {
 			return;
 		}
 
-		if(directorFields.exists(name)) {
+		if (directorFields.exists(name)) {
 			directorFields.set(name, v);
-		} else if(directorFields.exists('$name;const')) {
+		} else if (directorFields.exists('$name;const')) {
 			warn(ECustom("Cannot reassign final, for constant expression -> " + name));
 		} else if (staticVariables.exists(name)) {
 			staticVariables.set(name, v);
@@ -455,9 +455,9 @@ class Interp {
 		if (l != null)
 			return l.r;
 
-		if(directorFields.exists(id))
+		if (directorFields.exists(id))
 			return directorFields.get(id);
-		else if(directorFields.exists('$id;const'))
+		else if (directorFields.exists('$id;const'))
 			return directorFields.get('$id;const');
 
 		if (propertyLinks.get(id) != null) {
@@ -491,7 +491,7 @@ class Interp {
 			return v;
 		}
 
-		if(Iris.proxyImports.get(id) != null)
+		if (Iris.proxyImports.get(id) != null)
 			return Iris.proxyImports.get(id);
 
 		if (unpackClassCache.get(id) is Class) {
@@ -580,7 +580,7 @@ class Interp {
 							return val;
 						}, getter, setter));
 					} else {
-						if(de == 0) {
+						if (de == 0) {
 							directorFields.set((isConst ? '$n;const' : n), v);
 						} else {
 							declared.push({n: n, old: locals.get(n)});
