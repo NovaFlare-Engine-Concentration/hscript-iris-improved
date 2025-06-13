@@ -1,5 +1,4 @@
 import haxe.ds.StringMap;
-import Type;
 
 typedef HaxeStringMap = StringMap;
 typedef HaxeIntMap = haxe.ds.IntMap;

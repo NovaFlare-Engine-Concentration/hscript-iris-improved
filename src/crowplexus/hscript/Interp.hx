@@ -491,6 +491,9 @@ class Interp {
 			return v;
 		}
 
+		if(Iris.proxyImports.get(id) != null)
+			return Iris.proxyImports.get(id);
+
 		if (unpackClassCache.get(id) is Class) {
 			return unpackClassCache.get(id);
 		} else {

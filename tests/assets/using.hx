@@ -1,7 +1,5 @@
 package tests;
 
-import Type;
-
 using crowplexus.iris.utils.Ansi;
 function main() {
 	// mainStringTools(); // built-in
