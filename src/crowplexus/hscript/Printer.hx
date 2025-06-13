@@ -186,7 +186,7 @@ class Printer {
 				}
 			case EIdent(v):
 				add(v);
-			case EVar(n, t, e, gt, st, c, s):
+			case EVar(n, _, t, e, gt, st, c, s):
 				if (gt == null)
 					gt = "default";
 				if (st == null)
@@ -299,7 +299,7 @@ class Printer {
 				add("break");
 			case EContinue:
 				add("continue");
-			case EFunction(params, e, name, ret, s):
+			case EFunction(params, e, _, name, ret, s):
 				if (s == true)
 					add("static ");
 				add("function");

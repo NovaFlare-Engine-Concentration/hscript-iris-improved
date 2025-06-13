@@ -114,8 +114,9 @@ class Parser {
 	var idents: Array<Bool>;
 	var uid: Int = 0;
 	var abductCount: Int = 0;
-	var abducts = ["function", "if", "for", "while", "try", "switch"];
+	var abducts = ["function", "if", "for", "while", "try", "switch", "do"];
 	var sureStaticModifier: Bool = false;
+	var compatibles: Array<Bool> = [];
 
 	#if hscriptPos
 	var origin: String;
@@ -229,6 +230,7 @@ class Parser {
 	public function parseString(s: String, ?origin: String = "hscript") {
 		initParser(origin);
 		input = s;
+		compatibles = [];
 		readPos = 0;
 		var a = new Array();
 		while (true) {
@@ -340,8 +342,8 @@ class Parser {
 			return false;
 		return switch (expr(e)) {
 			case EBlock(_), EObject(_), ESwitch(_), EEnum(_, _): true;
-			case EFunction(_, e, _, _): isBlock(e);
-			case EVar(_, t, e, _): e != null ? isBlock(e) : t != null ? t.match(CTAnon(_)) : false;
+			case EFunction(_, e, _, _, _): isBlock(e);
+			case EVar(_, _, t, e, _): e != null ? isBlock(e) : t != null ? t.match(CTAnon(_)) : false;
 			case EIf(_, e1, e2): if (e2 != null) isBlock(e2) else isBlock(e1);
 			case EBinop(_, _, e): isBlock(e);
 			case EUnop(_, prefix, e): !prefix && isBlock(e);
@@ -363,7 +365,7 @@ class Parser {
 
 		var tk = token();
 		// this is a hack to support var a,b,c; with a single EVar
-		while (tk == TComma && e != null && expr(e).match(EVar(_))) {
+		while (tk == TComma && e != null && expr(e).match(EVar(_, _))) {
 			e = parseStructure("var"); // next variable
 			if (!expr(e).match(EIgnore(_)))
 				exprs.push(e);
@@ -421,11 +423,16 @@ class Parser {
 		#end
 		switch (tk) {
 			case TId(id):
-				if (abducts.contains(id))
+				var ttime = compatibles.length;
+				if (abducts.contains(id)) {
+					compatibles.push(true);
 					abductCount++;
+				}
 				var e = parseStructure(id);
-				if (abducts.contains(id))
+				if (abducts.contains(id)) {
+					while(compatibles.length > ttime) compatibles.pop();
 					abductCount--;
+				}
 				if (e == null)
 					e = mk(EIdent(id));
 				return parseExprNext(e);
@@ -438,7 +445,7 @@ class Parser {
 					abductCount++;
 					var eret = parseExpr();
 					abductCount--;
-					return mk(EFunction([], mk(EReturn(eret), p1)), p1);
+					return mk(EFunction([], mk(EReturn(eret), p1), abductCount), p1);
 				}
 				push(tk);
 				var e = parseExpr();
@@ -501,7 +508,11 @@ class Parser {
 						push(tk);
 				}
 				var a = new Array();
-				abductCount++;
+				var doit: Bool = {
+					if(compatibles.length > 0) compatibles.pop();
+					else false;
+				}
+				if(!doit) abductCount++;
 				while (true) {
 					parseFullExpr(a);
 					tk = token();
@@ -509,7 +520,7 @@ class Parser {
 						break;
 					push(tk);
 				}
-				abductCount--;
+				if(!doit) abductCount--;
 				return mk(EBlock(a), p1);
 			case TOp(op):
 				if (op == "-") {
@@ -544,7 +555,7 @@ class Parser {
 						case EFor(_), EWhile(_), EDoWhile(_):
 							var tmp = "__a_" + (uid++);
 							var e = mk(EBlock([
-								mk(EVar(tmp, null, mk(EArrayDecl([]), p1)), p1),
+								mk(EVar(tmp, abductCount, null, mk(EArrayDecl([]), p1)), p1),
 								mapCompr(tmp, a[0]),
 								mk(EIdent(tmp), p1),
 							]), p1);
@@ -577,7 +588,7 @@ class Parser {
 		}
 		ensureToken(TOp("->"));
 		var eret = parseExpr();
-		return mk(EFunction(args, mk(EReturn(eret), pmin)), pmin);
+		return mk(EFunction(args, mk(EReturn(eret), pmin), abductCount), pmin);
 	}
 
 	function parseMetaArgs() {
@@ -667,9 +678,10 @@ class Parser {
 					semic = true;
 					tk = token();
 				}
-				if (Type.enumEq(tk, TId("else")))
+				if (Type.enumEq(tk, TId("else"))) {
+					compatibles.push(true);
 					e2 = parseExpr();
-				else {
+				} else {
 					push(tk);
 					if (semic)
 						push(TSemicolon);
@@ -704,6 +716,9 @@ class Parser {
 				var ident = getIdent();
 				var tk = token();
 				var t = null;
+				#if IRIS_DEBUG
+				trace("变量名：" + ident + "，" + "层次：" + abductCount);
+				#end
 				if (tk == TPOpen) {
 					if (abductCount == 0 && id == "var") {
 						var getter1: Null<String> = null;
@@ -757,7 +772,7 @@ class Parser {
 					e = parseExpr();
 				else
 					push(tk);
-				mk(EVar(ident, t, e, getter, setter, (id == "final"), if (abductCount == 0) sureStaticModifier else false), p1,
+				mk(EVar(ident, abductCount, t, e, getter, setter, (id == "final"), if (abductCount == 0) sureStaticModifier else false), p1,
 					(e == null) ? tokenMax : pmax(e));
 			case "while":
 				var econd = parseExpr();
@@ -819,7 +834,7 @@ class Parser {
 					default: push(tk);
 				}
 				var inf = parseFunctionDecl();
-				mk(EFunction(inf.args, inf.body, name, inf.ret, if (abductCount == 0) sureStaticModifier else false), p1, pmax(inf.body));
+				mk(EFunction(inf.args, inf.body, abductCount, name, inf.ret, if (abductCount == 0) sureStaticModifier else false), p1, pmax(inf.body));
 			case "return":
 				var tk = token();
 				push(tk);
@@ -1062,7 +1077,7 @@ class Parser {
 							var className = path.join(".");
 							var cl = Tools.getClass(className);
 							if (cl != null) {
-								return mk(EVar(name, null, mk(EDirectValue(cl))));
+								return mk(EVar(name, abductCount, null, mk(EDirectValue(cl))));
 							}
 						}
 
@@ -1072,7 +1087,7 @@ class Parser {
 						}
 
 						// todo? add import to the beginning of the file?
-						mk(EVar(name, null, expr));
+						mk(EVar(name, abductCount, null, expr));
 					default:
 						error(ECustom("Typedef, unknown type " + t), tokenMin, tokenMax);
 						null;
@@ -1109,12 +1124,12 @@ class Parser {
 							abductCount++;
 							var eret = parseExpr();
 							abductCount--;
-							return mk(EFunction([{name: i}], mk(EReturn(eret), pmin(eret))), pmin(e1));
+							return mk(EFunction([{name: i}], mk(EReturn(eret), pmin(eret)), abductCount), pmin(e1));
 						case ECheckType(expr(_) => EIdent(i), t):
 							abductCount++;
 							var eret = parseExpr();
 							abductCount--;
-							return mk(EFunction([{name: i, t: t}], mk(EReturn(eret), pmin(eret))), pmin(e1));
+							return mk(EFunction([{name: i, t: t}], mk(EReturn(eret), pmin(eret)), abductCount), pmin(e1));
 						default:
 					}
 					unexpected(tk);
@@ -1358,7 +1373,9 @@ class Parser {
 								default: unexpected(t);
 							}
 						default:
+							#if IRIS_DEBUG
 							trace(t, fields, tps);
+							#end
 							unexpected(t);
 							break;
 					}

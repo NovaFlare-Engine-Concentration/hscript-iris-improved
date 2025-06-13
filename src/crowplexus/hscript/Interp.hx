@@ -57,6 +57,8 @@ class Interp {
 	public static var staticVariables: #if haxe3 Map<String, Dynamic> = new Map() #else Hash<Dynamic> = new Hash() #end;
 
 	#if haxe3
+	// 懒得直接在代码上区分了，不如多开一个图来的划算
+	public var directorFields: Map<String, Dynamic>;
 	public var variables: Map<String, Dynamic>;
 	public var imports: Map<String, Dynamic>;
 
@@ -65,6 +67,7 @@ class Interp {
 	var binops: Map<String, Expr->Expr->Dynamic>;
 	var propertyLinks: Map<String, PropertyAccessor>;
 	#else
+	public var directorFields: Hash<Dynamic>;
 	public var variables: Hash<Dynamic>;
 	public var imports: Hash<Dynamic>;
 
@@ -125,11 +128,13 @@ class Interp {
 		#if haxe3
 		propertyLinks = new Map();
 		variables = new Map<String, Dynamic>();
+		directorFields = new Map<String, Dynamic>();
 		props = new Map<String, Dynamic>();
 		imports = new Map<String, Dynamic>();
 		#else
 		propertyLinks = new Hash();
 		variables = new Hash();
+		directorFields = new Hash();
 		props = new Hash();
 		imports = new Hash();
 		#end
@@ -210,7 +215,11 @@ class Interp {
 			return;
 		}
 
-		if (staticVariables.exists(name)) {
+		if(directorFields.exists(name)) {
+			directorFields.set(name, v);
+		} else if(directorFields.exists('$name;const')) {
+			warn(ECustom("Cannot reassign final, for constant expression -> " + name));
+		} else if (staticVariables.exists(name)) {
 			staticVariables.set(name, v);
 		} else if (staticVariables.exists('$name;const')) {
 			warn(ECustom("Cannot reassign final, for constant expression -> " + name));
@@ -446,6 +455,11 @@ class Interp {
 		if (l != null)
 			return l.r;
 
+		if(directorFields.exists(id))
+			return directorFields.get(id);
+		else if(directorFields.exists('$id;const'))
+			return directorFields.get('$id;const');
+
 		if (propertyLinks.get(id) != null) {
 			var l = propertyLinks.get(id);
 			if (l.inState)
@@ -516,7 +530,7 @@ class Interp {
 				}
 			case EIdent(id):
 				return resolve(id);
-			case EVar(n, _, v, getter, setter, isConst, s):
+			case EVar(n, de, _, v, getter, setter, isConst, s):
 				if (getter == null)
 					getter = "default";
 				if (setter == null)
@@ -547,7 +561,7 @@ class Interp {
 						}
 					}
 				} else {
-					if (!isConst && (getter != "default" || setter != "default")) {
+					if (!isConst && de == 0 && (getter != "default" || setter != "default")) {
 						props.set(n, v);
 						propertyLinks.set(n, new PropertyAccessor(this, () -> {
 							if (props.exists(n))
@@ -563,8 +577,12 @@ class Interp {
 							return val;
 						}, getter, setter));
 					} else {
-						declared.push({n: n, old: locals.get(n)});
-						locals.set(n, {r: v, const: isConst});
+						if(de == 0) {
+							directorFields.set((isConst ? '$n;const' : n), v);
+						} else {
+							declared.push({n: n, old: locals.get(n)});
+							locals.set(n, {r: v, const: isConst});
+						}
 					}
 				}
 				return null;
@@ -665,7 +683,7 @@ class Interp {
 				}
 				return null; // yeah. -Crow
 
-			case EFunction(params, fexpr, name, _, s):
+			case EFunction(params, fexpr, _, name, _, s):
 				var capturedLocals = duplicate(locals);
 				var me = this;
 				var hasOpt = false, minParams = 0;
