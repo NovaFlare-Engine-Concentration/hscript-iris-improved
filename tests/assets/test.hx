@@ -77,7 +77,7 @@ function main() {
 	final m = "...";
 	m = "ajkfd";
 
-	someFuncThatDoesntExist();
+	//someFuncThatDoesntExist();
 
 	return "Return value";
 }
