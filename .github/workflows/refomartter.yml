@@ -1,0 +1,30 @@
+name: Reformatter
+
+on: workflow_dispatch
+
+jobs:
+  FormatJob:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Commit
+        uses: actions/checkout@v4
+
+      - name: Setup-haxe
+        uses: krdlab/setup-haxe@v1
+        with:
+          haxe-version: 4.3.7
+
+      - name: Initialized Libraries
+        run: |
+          haxelib install formatter --quiet
+
+      - name: Reformating
+        run: ./reformat.sh
+
+      - name: Commit The Change
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: '对代码格式进行印刷（@sz）'

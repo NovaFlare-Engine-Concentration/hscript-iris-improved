@@ -12,15 +12,11 @@ jobs:
       - name: Install Haxe
         uses: krdlab/setup-haxe@v1
         with:
-          haxe-version: 4.3.6
+          haxe-version: 4.3.7
 
       - name: Add Lib
         run: |
           haxelib install hxcpp --quiet
-          haxelib install formatter --quiet
-
-      - name: Fomatter Testing
-        run: ./reformat.sh
 
       - name: Testing
         run: |
