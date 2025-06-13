@@ -213,7 +213,8 @@ class Printer {
 				add("~/");
 				add(i);
 				add("/");
-				if(opt != null) add(opt);
+				if (opt != null)
+					add(opt);
 			case EParent(e):
 				add("(");
 				expr(e);

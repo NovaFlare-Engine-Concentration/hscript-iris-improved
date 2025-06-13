@@ -315,8 +315,9 @@ class Iris {
 		if (interp == null)
 			Iris.fatal("[Iris:get()]: " + interpErrStr + ", when trying to get variable \"" + field + "\", returning false...");
 		#end
-		if(interp != null) {
-			if(interp.directorFields.exists(field)) return interp.directorFields.get(field);
+		if (interp != null) {
+			if (interp.directorFields.exists(field))
+				return interp.directorFields.get(field);
 			return interp.variables.get(field);
 		}
 		return null;

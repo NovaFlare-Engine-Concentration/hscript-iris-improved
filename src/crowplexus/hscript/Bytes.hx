@@ -365,7 +365,7 @@ class Bytes {
 		#end
 		switch (e) {
 			case EIgnore(_):
-			case EEReg(_, _): //不会写QAQ
+			case EEReg(_, _): // 不会写QAQ
 			case EConst(c):
 				doEncodeExprType(EConst);
 				doEncodeConst(c);
