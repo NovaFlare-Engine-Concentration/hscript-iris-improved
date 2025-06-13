@@ -209,6 +209,11 @@ class Printer {
 					add(" = ");
 					expr(e);
 				}
+			case EEReg(i, opt):
+				add("~/");
+				add(i);
+				add("/");
+				if(opt != null) add(opt);
 			case EParent(e):
 				add("(");
 				expr(e);

@@ -80,6 +80,7 @@ enum Expr
 	EReturn(?e:Expr);
 	EArray(e:Expr, index:Expr);
 	EArrayDecl(e:Array<Expr>);
+	EEReg(r:String, ?opt:String);
 	ENew(cl:String, params:Array<Expr>);
 	EThrow(e:Expr);
 	ETry(e:Expr, v:String, t:Null<CType>, ecatch:Expr);

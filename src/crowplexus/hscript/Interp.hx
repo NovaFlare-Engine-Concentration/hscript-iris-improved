@@ -816,6 +816,8 @@ class Interp {
 				} else {
 					return arr[index];
 				}
+			case EEReg(i, opt):
+				return new EReg(i, (opt != null ? opt : ""));
 			case ENew(cl, params):
 				var a = new Array();
 				for (e in params)

@@ -45,6 +45,7 @@ enum Token {
 	TDoubleDot;
 	TMeta(s: String);
 	TPrepro(s: String);
+	TRegex(i: String, ?opt: String);
 	TQuestionDot;
 }
 
@@ -438,6 +439,23 @@ class Parser {
 				return parseExprNext(e);
 			case TConst(c):
 				return parseExprNext(mk(EConst(c)));
+			case TRegex(i, opt):
+				if(opt != null) {
+					if(
+						opt != "i"
+						&& opt != "g"
+						&& opt != "m"
+						#if (!cs && !js)
+						&& opt != "s"
+						#end
+						#if (cpp || neko)
+						&& opt != "u"
+						#end
+					) {
+						unexpected(tk);
+					}
+				}
+				return parseExprNext(mk(EEReg(i, opt)));
 			case TPOpen:
 				tk = token();
 				if (tk == TPClose) {
@@ -1881,6 +1899,23 @@ class Parser {
 								return TConst((exp > 0) ? CFloat(n * 10 / exp) : ((i == n) ? CInt(i) : CFloat(n)));
 						}
 					}
+				case "~".code if((char = readChar()) == "/".code):
+					var iBuf:StringBuf = new StringBuf();
+					while((char = readChar()) != "/".code) {
+						if(StringTools.isEof(char)) unexpected(TEof);
+						if(char == "\n".code) error(ECustom('Unexpected token: "~/"'), tokenMin, tokenMax);
+
+						iBuf.add(String.fromCharCode(char));
+					}
+
+					var opt:Null<String> = null;
+					char = readChar();
+					if(idents[char] == true) {
+						opt = String.fromCharCode(char);
+					} else {
+						readPos--;
+					}
+					return TRegex(iBuf.toString(), opt);
 				case ";".code:
 					return TSemicolon;
 				case "(".code:
@@ -2180,6 +2215,7 @@ class Parser {
 			case TSemicolon: ";";
 			case TBkOpen: "[";
 			case TBkClose: "]";
+			case TRegex(i, opt): "~/" + i + "/" + (opt != null ? opt : "");
 			case TQuestion: "?";
 			case TDoubleDot: ":";
 			case TMeta(id): "@" + id;
