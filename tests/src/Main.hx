@@ -15,10 +15,26 @@ using StringTools;
 @:access(crowplexus.iris.Iris)
 class Main {
 	static function main() {
-		// mainTest();
-		// mainBytes();
-		// testIndenticalNames();
+		mainTest();
+		mainBytes();
+		testIndenticalNames();
 		testUsing();
+		mainStatic();
+		mainProp();
+	}
+
+	static function mainProp() {
+		var sm1: Iris = new Iris(Resource.getString("assets/props_test.hx"));
+		sm1.call("new");
+		@:privateAccess trace('Script_Props_State: ${sm1.interp.props}, Script_Props_Links: ${sm1.interp.propertyLinks}');
+	}
+
+	static function mainStatic() {
+		var sm1: Iris = new Iris(Resource.getString("assets/static_test1.hx"));
+		var sm2: Iris = new Iris(Resource.getString("assets/static_test2.hx"));
+		sm1.call("new");
+		sm2.call("new");
+		trace("Static State: " + Interp.staticVariables);
 	}
 
 	/**
@@ -53,8 +69,8 @@ class Main {
 		var test2 = Test2.A(["Hello", "World"]);
 		trace(Type.enumEq(test, test2));
 
-		var result = myScript.call("non existent function");
-		trace(result);
+		/*var result = myScript.call("non existent function");
+			trace(result); */
 	}
 
 	/**

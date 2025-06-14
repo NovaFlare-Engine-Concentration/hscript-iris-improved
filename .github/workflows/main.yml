@@ -1,0 +1,24 @@
+name: Main
+
+on: [push, workflow_dispatch]
+
+jobs:
+  SEX:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Commit
+        uses: actions/checkout@v4
+
+      - name: Install Haxe
+        uses: krdlab/setup-haxe@v1
+        with:
+          haxe-version: 4.3.7
+
+      - name: Add Lib
+        run: |
+          haxelib install hxcpp --quiet
+
+      - name: Testing
+        run: |
+          cd ./tests
+          haxe linux.hxml

@@ -1,5 +1,4 @@
 import haxe.ds.StringMap;
-import Type;
 
 typedef HaxeStringMap = StringMap;
 typedef HaxeIntMap = haxe.ds.IntMap;
@@ -78,7 +77,7 @@ function main() {
 	final m = "...";
 	m = "ajkfd";
 
-	someFuncThatDoesntExist();
+	// someFuncThatDoesntExist();
 
 	return "Return value";
 }

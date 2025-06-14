@@ -45,6 +45,7 @@ enum Token {
 	TDoubleDot;
 	TMeta(s: String);
 	TPrepro(s: String);
+	TRegex(i: String, ?opt: String);
 	TQuestionDot;
 }
 
@@ -113,6 +114,10 @@ class Parser {
 	var ops: Array<Bool>;
 	var idents: Array<Bool>;
 	var uid: Int = 0;
+	var abductCount: Int = 0;
+	var abducts = ["function", "if", "for", "while", "try", "switch", "do"];
+	var sureStaticModifier: Bool = false;
+	var compatibles: Array<Bool> = [];
 
 	#if hscriptPos
 	var origin: String;
@@ -182,6 +187,11 @@ class Parser {
 	}
 
 	public inline function error(err, pmin, pmax) {
+		if (sureStaticModifier)
+			sureStaticModifier = false;
+		if (abductCount > 0)
+			abductCount = 0;
+
 		if (!resumeErrors)
 			#if hscriptPos
 			throw new Error(err, pmin, pmax, origin, line);
@@ -221,6 +231,7 @@ class Parser {
 	public function parseString(s: String, ?origin: String = "hscript") {
 		initParser(origin);
 		input = s;
+		compatibles = [];
 		readPos = 0;
 		var a = new Array();
 		while (true) {
@@ -332,8 +343,8 @@ class Parser {
 			return false;
 		return switch (expr(e)) {
 			case EBlock(_), EObject(_), ESwitch(_), EEnum(_, _): true;
-			case EFunction(_, e, _, _): isBlock(e);
-			case EVar(_, t, e, _): e != null ? isBlock(e) : t != null ? t.match(CTAnon(_)) : false;
+			case EFunction(_, e, _, _, _): isBlock(e);
+			case EVar(_, _, t, e, _): e != null ? isBlock(e) : t != null ? t.match(CTAnon(_)) : false;
 			case EIf(_, e1, e2): if (e2 != null) isBlock(e2) else isBlock(e1);
 			case EBinop(_, _, e): isBlock(e);
 			case EUnop(_, prefix, e): !prefix && isBlock(e);
@@ -355,7 +366,7 @@ class Parser {
 
 		var tk = token();
 		// this is a hack to support var a,b,c; with a single EVar
-		while (tk == TComma && e != null && expr(e).match(EVar(_))) {
+		while (tk == TComma && e != null && expr(e).match(EVar(_, _))) {
 			e = parseStructure("var"); // next variable
 			if (!expr(e).match(EIgnore(_)))
 				exprs.push(e);
@@ -413,18 +424,37 @@ class Parser {
 		#end
 		switch (tk) {
 			case TId(id):
+				var ttime = compatibles.length;
+				if (abducts.contains(id)) {
+					compatibles.push(true);
+					abductCount++;
+				}
 				var e = parseStructure(id);
+				if (abducts.contains(id)) {
+					while (compatibles.length > ttime)
+						compatibles.pop();
+					abductCount--;
+				}
 				if (e == null)
 					e = mk(EIdent(id));
 				return parseExprNext(e);
 			case TConst(c):
 				return parseExprNext(mk(EConst(c)));
+			case TRegex(i, opt):
+				if (opt != null) {
+					if (opt != "i" && opt != "g" && opt != "m" #if (!cs && !js) && opt != "s" #end#if (cpp || neko) && opt != "u" #end) {
+						unexpected(tk);
+					}
+				}
+				return parseExprNext(mk(EEReg(i, opt)));
 			case TPOpen:
 				tk = token();
 				if (tk == TPClose) {
 					ensureToken(TOp("->"));
+					abductCount++;
 					var eret = parseExpr();
-					return mk(EFunction([], mk(EReturn(eret), p1)), p1);
+					abductCount--;
+					return mk(EFunction([], mk(EReturn(eret), p1), abductCount), p1);
 				}
 				push(tk);
 				var e = parseExpr();
@@ -487,6 +517,14 @@ class Parser {
 						push(tk);
 				}
 				var a = new Array();
+				var doit: Bool = {
+					if (compatibles.length > 0)
+						compatibles.pop();
+					else
+						false;
+				}
+				if (!doit)
+					abductCount++;
 				while (true) {
 					parseFullExpr(a);
 					tk = token();
@@ -494,6 +532,8 @@ class Parser {
 						break;
 					push(tk);
 				}
+				if (!doit)
+					abductCount--;
 				return mk(EBlock(a), p1);
 			case TOp(op):
 				if (op == "-") {
@@ -528,7 +568,7 @@ class Parser {
 						case EFor(_), EWhile(_), EDoWhile(_):
 							var tmp = "__a_" + (uid++);
 							var e = mk(EBlock([
-								mk(EVar(tmp, null, mk(EArrayDecl([]), p1)), p1),
+								mk(EVar(tmp, abductCount, null, mk(EArrayDecl([]), p1)), p1),
 								mapCompr(tmp, a[0]),
 								mk(EIdent(tmp), p1),
 							]), p1);
@@ -561,7 +601,7 @@ class Parser {
 		}
 		ensureToken(TOp("->"));
 		var eret = parseExpr();
-		return mk(EFunction(args, mk(EReturn(eret), pmin)), pmin);
+		return mk(EFunction(args, mk(EReturn(eret), pmin), abductCount), pmin);
 	}
 
 	function parseMetaArgs() {
@@ -651,18 +691,91 @@ class Parser {
 					semic = true;
 					tk = token();
 				}
-				if (Type.enumEq(tk, TId("else")))
+				if (Type.enumEq(tk, TId("else"))) {
+					compatibles.push(true);
 					e2 = parseExpr();
-				else {
+				} else {
 					push(tk);
 					if (semic)
 						push(TSemicolon);
 				}
 				mk(EIf(cond, e1, e2), p1, (e2 == null) ? tokenMax : pmax(e2));
+			case "static":
+				if (abductCount == 0) {
+					var t = token();
+					switch (t) {
+						case TId(byd):
+							if (byd == "var" || byd == "final" || byd == "function") {
+								sureStaticModifier = true;
+								var ret = parseStructure(byd);
+								sureStaticModifier = false;
+								return ret;
+							} else if (byd == "inline") {
+								if (!maybe(TId("function")))
+									return unexpected(TId(byd));
+								sureStaticModifier = true;
+								var ret = parseStructure("function");
+								sureStaticModifier = false;
+								return ret;
+							} else unexpected(TId(byd));
+						default: unexpected(TId(id));
+					}
+				} else
+					error(ECustom('Cannot Set-up "$id" In Local.'), tokenMin, tokenMax);
+				null;
 			case "var", "final":
+				var getter: String = "default";
+				var setter: String = "default";
 				var ident = getIdent();
 				var tk = token();
 				var t = null;
+				#if IRIS_DEBUG
+				trace("变量名：" + ident + "，" + "层次：" + abductCount);
+				#end
+				if (tk == TPOpen) {
+					if (abductCount == 0 && id == "var") {
+						var getter1: Null<String> = null;
+						var setter1: Null<String> = null;
+						var displayComma: Bool = false;
+						var closed: Bool = false;
+						while (true) {
+							var t = token();
+							switch (t) {
+								case TComma:
+									if (getter != null && !displayComma) {
+										displayComma = true;
+									} else unexpected(t);
+								case TId(byd):
+									if (getter1 == null && !displayComma) {
+										if (byd == "get" || byd == "never" || byd == "default" || byd == "null") {
+											getter1 = byd;
+										} else
+											unexpected(t);
+									} else if (setter1 == null && displayComma) {
+										if (byd == "set" || byd == "never" || byd == "default" || byd == "null") {
+											setter1 = byd;
+										} else
+											unexpected(t);
+									} else unexpected(t);
+								case TPClose:
+									if (getter1 != null && setter1 != null) closed = true; else unexpected(t);
+								default:
+									unexpected(t);
+							}
+
+							if (closed)
+								break;
+						}
+
+						if (getter1 != null)
+							getter = getter1;
+						if (setter1 != null)
+							setter = setter1;
+
+						tk = token();
+					} else
+						unexpected(tk);
+				}
 				if (tk == TDoubleDot && allowTypes) {
 					t = parseType();
 					tk = token();
@@ -672,7 +785,8 @@ class Parser {
 					e = parseExpr();
 				else
 					push(tk);
-				mk(EVar(ident, t, e, id == "final"), p1, (e == null) ? tokenMax : pmax(e));
+				mk(EVar(ident, abductCount, t, e, getter, setter, (id == "final"), if (abductCount == 0) sureStaticModifier else false), p1,
+					(e == null) ? tokenMax : pmax(e));
 			case "while":
 				var econd = parseExpr();
 				var e = parseExpr();
@@ -698,9 +812,33 @@ class Parser {
 			case "continue": mk(EContinue);
 			case "else": unexpected(TId(id));
 			case "inline":
-				if (!maybe(TId("function")))
-					unexpected(TId("inline"));
-				return parseStructure("function");
+				var t = token();
+				switch (t) {
+					case TId(id):
+						if (id == "static") {
+							if (!sureStaticModifier && abductCount == 0) {
+								if (abductCount == 0) {
+									var t = token();
+									switch (t) {
+										case TId(byd):
+											if (byd == "function") {
+												sureStaticModifier = true;
+												var ret = parseStructure(byd);
+												sureStaticModifier = false;
+												return ret;
+											} else unexpected(TId(id));
+										default: unexpected(TId(id));
+									}
+								} else
+									error(ECustom('Cannot Set-up "$id" In Local.'), tokenMin, tokenMax);
+								return null;
+							}
+						} else if (id == "function") {
+							return parseStructure("function");
+						}
+					default: // nothing here
+				}
+				unexpected(t);
 			case "function":
 				var tk = token();
 				var name = null;
@@ -709,7 +847,7 @@ class Parser {
 					default: push(tk);
 				}
 				var inf = parseFunctionDecl();
-				mk(EFunction(inf.args, inf.body, name, inf.ret), p1, pmax(inf.body));
+				mk(EFunction(inf.args, inf.body, abductCount, name, inf.ret, if (abductCount == 0) sureStaticModifier else false), p1, pmax(inf.body));
 			case "return":
 				var tk = token();
 				push(tk);
@@ -952,7 +1090,7 @@ class Parser {
 							var className = path.join(".");
 							var cl = Tools.getClass(className);
 							if (cl != null) {
-								return mk(EVar(name, null, mk(EDirectValue(cl))));
+								return mk(EVar(name, abductCount, null, mk(EDirectValue(cl))));
 							}
 						}
 
@@ -962,7 +1100,7 @@ class Parser {
 						}
 
 						// todo? add import to the beginning of the file?
-						mk(EVar(name, null, expr));
+						mk(EVar(name, abductCount, null, expr));
 					default:
 						error(ECustom("Typedef, unknown type " + t), tokenMin, tokenMax);
 						null;
@@ -996,11 +1134,15 @@ class Parser {
 					// single arg reinterpretation of `f -> e` , `(f) -> e` and `(f:T) -> e`
 					switch (expr(e1)) {
 						case EIdent(i), EParent(expr(_) => EIdent(i)):
+							abductCount++;
 							var eret = parseExpr();
-							return mk(EFunction([{name: i}], mk(EReturn(eret), pmin(eret))), pmin(e1));
+							abductCount--;
+							return mk(EFunction([{name: i}], mk(EReturn(eret), pmin(eret)), abductCount), pmin(e1));
 						case ECheckType(expr(_) => EIdent(i), t):
+							abductCount++;
 							var eret = parseExpr();
-							return mk(EFunction([{name: i, t: t}], mk(EReturn(eret), pmin(eret))), pmin(e1));
+							abductCount--;
+							return mk(EFunction([{name: i, t: t}], mk(EReturn(eret), pmin(eret)), abductCount), pmin(e1));
 						default:
 					}
 					unexpected(tk);
@@ -1244,7 +1386,9 @@ class Parser {
 								default: unexpected(t);
 							}
 						default:
+							#if IRIS_DEBUG
 							trace(t, fields, tps);
+							#end
 							unexpected(t);
 							break;
 					}
@@ -1750,6 +1894,25 @@ class Parser {
 								return TConst((exp > 0) ? CFloat(n * 10 / exp) : ((i == n) ? CInt(i) : CFloat(n)));
 						}
 					}
+				case "~".code if ((char = readChar()) == "/".code):
+					var iBuf: StringBuf = new StringBuf();
+					while ((char = readChar()) != "/".code) {
+						if (StringTools.isEof(char))
+							unexpected(TEof);
+						if (char == "\n".code)
+							error(ECustom('Unexpected token: "~/"'), tokenMin, tokenMax);
+
+						iBuf.add(String.fromCharCode(char));
+					}
+
+					var opt: Null<String> = null;
+					char = readChar();
+					if (idents[char] == true) {
+						opt = String.fromCharCode(char);
+					} else {
+						readPos--;
+					}
+					return TRegex(iBuf.toString(), opt);
 				case ";".code:
 					return TSemicolon;
 				case "(".code:
@@ -2049,6 +2212,7 @@ class Parser {
 			case TSemicolon: ";";
 			case TBkOpen: "[";
 			case TBkClose: "]";
+			case TRegex(i, opt): "~/" + i + "/" + (opt != null ? opt : "");
 			case TQuestion: "?";
 			case TDoubleDot: ":";
 			case TMeta(id): "@" + id;

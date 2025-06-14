@@ -64,7 +64,7 @@ enum Expr
 	EConst(c:Const);
 	EIdent(v:String);
 	EImport(v:String, as:String);
-	EVar(n:String, ?t:CType, ?e:Expr, ?isConst:Bool);
+	EVar(n:String, depth:Int, ?t:CType, ?e:Expr, ?getter:String, ?setter:String, ?isConst:Bool, ?staticModifer:Bool);
 	EParent(e:Expr);
 	EBlock(e:Array<Expr>);
 	EField(e:Expr, f:String, s:Bool);
@@ -76,10 +76,11 @@ enum Expr
 	EFor(v:String, it:Expr, e:Expr);
 	EBreak;
 	EContinue;
-	EFunction(args:Array<Argument>, e:Expr, ?name:String, ?ret:CType);
+	EFunction(args:Array<Argument>, e:Expr, depth:Int, ?name:String, ?ret:CType, ?staticModifer:Bool);
 	EReturn(?e:Expr);
 	EArray(e:Expr, index:Expr);
 	EArrayDecl(e:Array<Expr>);
+	EEReg(r:String, ?opt:String);
 	ENew(cl:String, params:Array<Expr>);
 	EThrow(e:Expr);
 	ETry(e:Expr, v:String, t:Null<CType>, ecatch:Expr);

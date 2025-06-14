@@ -186,17 +186,35 @@ class Printer {
 				}
 			case EIdent(v):
 				add(v);
-			case EVar(n, t, e, c):
+			case EVar(n, _, t, e, gt, st, c, s):
+				if (gt == null)
+					gt = "default";
+				if (st == null)
+					st = "default";
+
+				if (s == true)
+					add("static ");
 				if (c) {
 					add("final " + n);
 				} else {
 					add("var " + n);
+				}
+				if (!c && (gt != "default" || st != "default")) {
+					add("(");
+					add(gt + ", " + st);
+					add(")");
 				}
 				addType(t);
 				if (e != null) {
 					add(" = ");
 					expr(e);
 				}
+			case EEReg(i, opt):
+				add("~/");
+				add(i);
+				add("/");
+				if (opt != null)
+					add(opt);
 			case EParent(e):
 				add("(");
 				expr(e);
@@ -287,7 +305,9 @@ class Printer {
 				add("break");
 			case EContinue:
 				add("continue");
-			case EFunction(params, e, name, ret):
+			case EFunction(params, e, _, name, ret, s):
+				if (s == true)
+					add("static ");
 				add("function");
 				if (name != null)
 					add(" " + name);

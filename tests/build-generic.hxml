@@ -1,7 +1,7 @@
 # Generic Haxe stuffs to make the project compile
 -cp src
 # link to crowplexus library
--cp ../
+-cp ../src
 -D analyzer-optimize
 -main Main
 
@@ -21,6 +21,9 @@
 
 --resource assets/using.hx@assets/using.hx
 --resource assets/bytes.hx@assets/bytes.hx
+--resource assets/static_test1.hx@assets/static_test1.hx
+--resource assets/static_test2.hx@assets/static_test2.hx
+--resource assets/props_test.hx@assets/props_test.hx
 --resource assets/test.hx@assets/test.hx
 
 ../extraParams.hxml

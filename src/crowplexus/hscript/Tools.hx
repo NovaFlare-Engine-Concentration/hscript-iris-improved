@@ -28,7 +28,7 @@ class Tools {
 	public static function iter(e: Expr, f: Expr->Void) {
 		switch (expr(e)) {
 			case EConst(_), EIdent(_):
-			case EVar(_, _, e, _):
+			case EVar(_, _, _, e, getter, setter, _, s):
 				if (e != null)
 					f(e);
 			case EParent(e):
@@ -62,7 +62,7 @@ class Tools {
 				f(it);
 				f(e);
 			case EBreak, EContinue:
-			case EFunction(_, e, _, _):
+			case EFunction(_, e, _, _, _, s):
 				f(e);
 			case EReturn(e):
 				if (e != null)
@@ -111,7 +111,7 @@ class Tools {
 	public static function map(e: Expr, f: Expr->Expr) {
 		var edef = switch (expr(e)) {
 			case EConst(_), EIdent(_), EBreak, EContinue: expr(e);
-			case EVar(n, t, e, c): EVar(n, t, if (e != null) f(e) else null, c);
+			case EVar(n, d, t, e, c): EVar(n, d, t, if (e != null) f(e) else null, c);
 			case EParent(e): EParent(f(e));
 			case EBlock(el): EBlock([for (e in el) f(e)]);
 			case EField(e, fi, s): EField(f(e), fi, s);
@@ -122,7 +122,7 @@ class Tools {
 			case EWhile(c, e): EWhile(f(c), f(e));
 			case EDoWhile(c, e): EDoWhile(f(c), f(e));
 			case EFor(v, it, e): EFor(v, f(it), f(e));
-			case EFunction(args, e, name, t): EFunction(args, f(e), name, t);
+			case EFunction(args, e, de, name, t): EFunction(args, f(e), de, name, t);
 			case EReturn(e): EReturn(if (e != null) f(e) else null);
 			case EArray(e, i): EArray(f(e), f(i));
 			case EArrayDecl(el): EArrayDecl([for (e in el) f(e)]);

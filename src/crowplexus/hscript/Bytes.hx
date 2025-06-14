@@ -365,13 +365,14 @@ class Bytes {
 		#end
 		switch (e) {
 			case EIgnore(_):
+			case EEReg(_, _): // 不会写QAQ
 			case EConst(c):
 				doEncodeExprType(EConst);
 				doEncodeConst(c);
 			case EIdent(v):
 				doEncodeExprType(EIdent);
 				doEncodeString(v);
-			case EVar(n, _, e, c):
+			case EVar(n, _, _, e, getter, setter, c, s):
 				doEncodeExprType(EVar);
 				doEncodeString(n);
 				if (e == null)
@@ -433,7 +434,7 @@ class Bytes {
 				doEncodeExprType(EBreak);
 			case EContinue:
 				doEncodeExprType(EContinue);
-			case EFunction(params, e, name, _):
+			case EFunction(params, e, _, name, _):
 				doEncodeExprType(EFunction);
 				bout.addByte(params.length);
 				for (p in params)
@@ -570,7 +571,7 @@ class Bytes {
 				var v = doDecodeString();
 				var e = doDecode();
 				var c = doDecodeBool();
-				EVar(v, e, c);
+				EVar(v, 0, e, c);
 			case EParent:
 				EParent(doDecode());
 			case EBlock:
@@ -622,7 +623,7 @@ class Bytes {
 					params.push(doDecodeArg());
 				var e = doDecode();
 				var name = doDecodeString();
-				EFunction(params, e, (name == "") ? null : name);
+				EFunction(params, e, 0, (name == "") ? null : name);
 			case EReturn:
 				EReturn(doDecode());
 			case EArray:
