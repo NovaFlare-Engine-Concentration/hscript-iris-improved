@@ -4,6 +4,7 @@ import crowplexus.iris.utils.Ansi;
 import crowplexus.hscript.proxy.ProxyType;
 import haxe.ds.StringMap;
 import crowplexus.hscript.*;
+import crowplexus.hscript.Expr;
 import crowplexus.iris.ErrorSeverity;
 import crowplexus.iris.IrisConfig;
 import crowplexus.iris.utils.UsingEntry;
@@ -270,7 +271,18 @@ class Iris {
 
 		Iris.instances.set(this.name, this);
 		this.config.packageName = parser.packageName;
-		return interp.execute(expr);
+		return try {
+			if(expr != null) interp.execute(expr);
+			null;
+		#if hscriptPos
+		} catch(e:Error) {
+			Iris.error(e.toString().substr((e.origin + ":" + e.line + ": ").length), cast {fileName: e.origin, lineNumber: e.line});
+			null;
+		#end
+		} catch(e) {
+			Iris.error(Std.string(e), cast interp.posInfos());
+			null;
+		}
 	}
 
 	/**
@@ -280,7 +292,17 @@ class Iris {
 	**/
 	public function parse(force: Bool = false) {
 		if (force || expr == null) {
-			expr = parser.parseString(scriptCode, this.name);
+			expr = try {
+				parser.parseString(scriptCode, this.name);
+			#if hscriptPos
+			} catch(e:Error) {
+				Iris.error(e.toString().substr((e.origin + ":" + e.line + ": ").length), cast {fileName: e.origin, lineNumber: parser.line});
+				null;
+			#end
+			} catch(e) {
+				@:privateAccess Iris.error(Std.string(e), cast {fileName: parser.origin, lineNumber: parser.line});
+				null;
+			}
 		}
 		return expr;
 	}
@@ -337,7 +359,9 @@ class Iris {
 			return;
 		}
 
-		if (allowOverride || !interp.variables.exists(name))
+		if(interp.imports != null && (value is Class || value is Enum))
+			interp.imports.set(name, value);
+		else if (allowOverride || !interp.variables.exists(name))
 			interp.variables.set(name, value);
 	}
 
@@ -375,7 +399,7 @@ class Iris {
 			Iris.error(Printer.errorToString(e, false), this.interp.posInfos());
 		}
 		#end
-		catch (e:haxe.Exception) {
+		catch(e) {
 			var pos = isFunction ? this.interp.posInfos() : Iris.getDefaultPos(this.name);
 			Iris.error(Std.string(e), pos);
 		}

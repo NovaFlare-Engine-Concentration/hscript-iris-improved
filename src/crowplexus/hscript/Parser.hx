@@ -1894,6 +1894,19 @@ class Parser {
 								return TConst((exp > 0) ? CFloat(n * 10 / exp) : ((i == n) ? CInt(i) : CFloat(n)));
 						}
 					}
+<<<<<<< HEAD
+				case "~".code if((char = readChar()) == "/".code):
+					var iBuf:StringBuf = new StringBuf();
+					var prevChar = char;
+					var nextChar = readChar();
+					while((char = nextChar) != "/".code || prevChar == "\\".code) {
+						nextChar = readChar();
+						if(StringTools.isEof(char)) unexpected(TEof);
+						if(char == "\n".code) error(ECustom('Unexpected token: "~/"'), tokenMin, tokenMax);
+						//trace(String.fromCharCode(prevChar) + ".." + String.fromCharCode(char) + ".." + String.fromCharCode(nextChar));
+						if(!(char == '\\'.code && nextChar == "/".code))
+							iBuf.add(String.fromCharCode(char));
+=======
 				case "~".code if ((char = readChar()) == "/".code):
 					var iBuf: StringBuf = new StringBuf();
 					while ((char = readChar()) != "/".code) {
@@ -1901,8 +1914,9 @@ class Parser {
 							unexpected(TEof);
 						if (char == "\n".code)
 							error(ECustom('Unexpected token: "~/"'), tokenMin, tokenMax);
+>>>>>>> bf3b612abd4b7c70ef80c838fca84c59c3ed2287
 
-						iBuf.add(String.fromCharCode(char));
+						prevChar = char;
 					}
 
 					var opt: Null<String> = null;
