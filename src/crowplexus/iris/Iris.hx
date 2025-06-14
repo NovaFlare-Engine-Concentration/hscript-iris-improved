@@ -301,7 +301,7 @@ class Iris {
 				null;
 			#end
 			} catch (e) {
-				@:privateAccess Iris.error(Std.string(e), cast {fileName: parser.origin, lineNumber: parser.line});
+				@:privateAccess Iris.error(Std.string(e), cast {fileName: this.name, lineNumber: 0});
 				null;
 			}
 		}
