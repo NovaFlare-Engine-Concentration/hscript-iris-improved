@@ -441,8 +441,18 @@ class Parser {
 			case TConst(c):
 				return parseExprNext(mk(EConst(c)));
 			case TRegex(i, opt):
-				if (opt != null) {
-					if (opt != "i" && opt != "g" && opt != "m" #if (!cs && !js) && opt != "s" #end#if (cpp || neko) && opt != "u" #end) {
+				if(opt != null) {
+					if(
+						opt != "i"
+						&& opt != "g"
+						&& opt != "m"
+						#if (!cs && !js)
+						&& opt != "s"
+						#end
+						#if (cpp || neko)
+						&& opt != "u"
+						#end
+					) {
 						unexpected(tk);
 					}
 				}
@@ -1894,7 +1904,6 @@ class Parser {
 								return TConst((exp > 0) ? CFloat(n * 10 / exp) : ((i == n) ? CInt(i) : CFloat(n)));
 						}
 					}
-<<<<<<< HEAD
 				case "~".code if((char = readChar()) == "/".code):
 					var iBuf:StringBuf = new StringBuf();
 					var prevChar = char;
@@ -1906,22 +1915,13 @@ class Parser {
 						//trace(String.fromCharCode(prevChar) + ".." + String.fromCharCode(char) + ".." + String.fromCharCode(nextChar));
 						if(!(char == '\\'.code && nextChar == "/".code))
 							iBuf.add(String.fromCharCode(char));
-=======
-				case "~".code if ((char = readChar()) == "/".code):
-					var iBuf: StringBuf = new StringBuf();
-					while ((char = readChar()) != "/".code) {
-						if (StringTools.isEof(char))
-							unexpected(TEof);
-						if (char == "\n".code)
-							error(ECustom('Unexpected token: "~/"'), tokenMin, tokenMax);
->>>>>>> bf3b612abd4b7c70ef80c838fca84c59c3ed2287
 
 						prevChar = char;
 					}
 
-					var opt: Null<String> = null;
+					var opt:Null<String> = null;
 					char = readChar();
-					if (idents[char] == true) {
+					if(idents[char] == true) {
 						opt = String.fromCharCode(char);
 					} else {
 						readPos--;
