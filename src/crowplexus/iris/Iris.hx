@@ -276,7 +276,7 @@ class Iris {
 			null;
 		#if hscriptPos
 		} catch(e:Error) {
-			Iris.error(e.toString().substr((e.origin + ":" + e.line + ": ").length), cast {fileName: e.origin, lineNumber: e.line});
+			Iris.error(Printer.errorToString(e, false), cast {fileName: e.origin, lineNumber: e.line});
 			null;
 		#end
 		} catch(e) {
@@ -296,7 +296,7 @@ class Iris {
 				parser.parseString(scriptCode, this.name);
 			#if hscriptPos
 			} catch(e:Error) {
-				Iris.error(e.toString().substr((e.origin + ":" + e.line + ": ").length), cast {fileName: e.origin, lineNumber: parser.line});
+				Iris.error(Printer.errorToString(e, false), cast {fileName: e.origin, lineNumber: parser.line});
 				null;
 			#end
 			} catch(e) {
@@ -340,6 +340,8 @@ class Iris {
 		if (interp != null) {
 			if (interp.directorFields.exists(field))
 				return interp.directorFields.get(field);
+			else if(interp.directorFields.exists(field + ";const"))
+				return interp.directorFields.get(field + ";const");
 			return interp.variables.get(field);
 		}
 		return null;
