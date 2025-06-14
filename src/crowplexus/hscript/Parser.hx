@@ -441,18 +441,8 @@ class Parser {
 			case TConst(c):
 				return parseExprNext(mk(EConst(c)));
 			case TRegex(i, opt):
-				if(opt != null) {
-					if(
-						opt != "i"
-						&& opt != "g"
-						&& opt != "m"
-						#if (!cs && !js)
-						&& opt != "s"
-						#end
-						#if (cpp || neko)
-						&& opt != "u"
-						#end
-					) {
+				if (opt != null) {
+					if (opt != "i" && opt != "g" && opt != "m" #if (!cs && !js) && opt != "s" #end#if (cpp || neko) && opt != "u" #end) {
 						unexpected(tk);
 					}
 				}
@@ -1904,24 +1894,26 @@ class Parser {
 								return TConst((exp > 0) ? CFloat(n * 10 / exp) : ((i == n) ? CInt(i) : CFloat(n)));
 						}
 					}
-				case "~".code if((char = readChar()) == "/".code):
-					var iBuf:StringBuf = new StringBuf();
+				case "~".code if ((char = readChar()) == "/".code):
+					var iBuf: StringBuf = new StringBuf();
 					var prevChar = char;
 					var nextChar = readChar();
-					while((char = nextChar) != "/".code || prevChar == "\\".code) {
+					while ((char = nextChar) != "/".code || prevChar == "\\".code) {
 						nextChar = readChar();
-						if(StringTools.isEof(char)) unexpected(TEof);
-						if(char == "\n".code) error(ECustom('Unexpected token: "~/"'), tokenMin, tokenMax);
-						//trace(String.fromCharCode(prevChar) + ".." + String.fromCharCode(char) + ".." + String.fromCharCode(nextChar));
-						if(!(char == '\\'.code && nextChar == "/".code))
+						if (StringTools.isEof(char))
+							unexpected(TEof);
+						if (char == "\n".code)
+							error(ECustom('Unexpected token: "~/"'), tokenMin, tokenMax);
+						// trace(String.fromCharCode(prevChar) + ".." + String.fromCharCode(char) + ".." + String.fromCharCode(nextChar));
+						if (!(char == '\\'.code && nextChar == "/".code))
 							iBuf.add(String.fromCharCode(char));
 
 						prevChar = char;
 					}
 
-					var opt:Null<String> = null;
+					var opt: Null<String> = null;
 					char = readChar();
-					if(idents[char] == true) {
+					if (idents[char] == true) {
 						opt = String.fromCharCode(char);
 					} else {
 						readPos--;

@@ -272,34 +272,35 @@ class Iris {
 		Iris.instances.set(this.name, this);
 		this.config.packageName = parser.packageName;
 		return try {
-			if(expr != null) interp.execute(expr);
+			if (expr != null)
+				interp.execute(expr);
 			null;
 		#if hscriptPos
-		} catch(e:Error) {
+		} catch (e:Error) {
 			Iris.error(Printer.errorToString(e, false), cast {fileName: e.origin, lineNumber: e.line});
 			null;
 		#end
-		} catch(e) {
+		} catch (e) {
 			Iris.error(Std.string(e), cast interp.posInfos());
 			null;
 		}
 	}
 
 	/**
-	 * If you want to override the script, you should do parse(true);
-	 *
-	 * just parse(); otherwise, forcing may fix some behaviour depending on your implementation.
-	**/
+		 * If you want to override the script, you should do parse(true);
+		 *
+		 * just parse(); otherwise, forcing may fix some behaviour depending on your implementation.
+		**/
 	public function parse(force: Bool = false) {
 		if (force || expr == null) {
 			expr = try {
 				parser.parseString(scriptCode, this.name);
 			#if hscriptPos
-			} catch(e:Error) {
+			} catch (e:Error) {
 				Iris.error(Printer.errorToString(e, false), cast {fileName: e.origin, lineNumber: parser.line});
 				null;
 			#end
-			} catch(e) {
+			} catch (e) {
 				@:privateAccess Iris.error(Std.string(e), cast {fileName: parser.origin, lineNumber: parser.line});
 				null;
 			}
@@ -308,12 +309,12 @@ class Iris {
 	}
 
 	/**
-	 * Appends Default Classes/Enums for the Script to use.
-	**/
+			 * Appends Default Classes/Enums for the Script to use.
+			**/
 	public function preset(): Void {
 		/*set("Std", Std);
-			set("StringTools", StringTools);
-			set("Math", Math); */
+					set("StringTools", StringTools);
+					set("Math", Math); */
 		#if hscriptPos
 		// overriding trace for good measure.
 		// if you're a game developer or a fnf modder (hi guys),
@@ -329,9 +330,9 @@ class Iris {
 	}
 
 	/**
-	 * Returns a field from the script.
-	 * @param field 	The field that needs to be looked for.
-	 */
+			 * Returns a field from the script.
+			 * @param field 	The field that needs to be looked for.
+			 */
 	public function get(field: String): Dynamic {
 		#if IRIS_DEBUG
 		if (interp == null)
@@ -340,7 +341,7 @@ class Iris {
 		if (interp != null) {
 			if (interp.directorFields.exists(field))
 				return interp.directorFields.get(field);
-			else if(interp.directorFields.exists(field + ";const"))
+			else if (interp.directorFields.exists(field + ";const"))
 				return interp.directorFields.get(field + ";const");
 			return interp.variables.get(field);
 		}
@@ -348,11 +349,11 @@ class Iris {
 	}
 
 	/**
-	 * Sets a new field to the script
-	 * @param name          The name of your new field, scripts will be able to use the field with the name given.
-	 * @param value         The value for your new field.
-	 * @param allowOverride If set to true, when setting the new field, we will ignore any previously set fields of the same name.
-	 */
+			 * Sets a new field to the script
+			 * @param name          The name of your new field, scripts will be able to use the field with the name given.
+			 * @param value         The value for your new field.
+			 * @param allowOverride If set to true, when setting the new field, we will ignore any previously set fields of the same name.
+			 */
 	public function set(name: String, value: Dynamic, allowOverride: Bool = true): Void {
 		if (interp == null || interp.variables == null) {
 			#if IRIS_DEBUG
@@ -361,17 +362,17 @@ class Iris {
 			return;
 		}
 
-		if(interp.imports != null && (value is Class || value is Enum))
+		if (interp.imports != null && (value is Class || value is Enum))
 			interp.imports.set(name, value);
 		else if (allowOverride || !interp.variables.exists(name))
 			interp.variables.set(name, value);
 	}
 
 	/**
-	 * Calls a method on the script
-	 * @param fun       The name of the method you wanna call.
-	 * @param args      The arguments that the method needs.
-	 */
+			 * Calls a method on the script
+			 * @param fun       The name of the method you wanna call.
+			 * @param args      The arguments that the method needs.
+			 */
 	public function call(fun: String, ?args: Array<Dynamic>): IrisCall {
 		if (interp == null) {
 			#if IRIS_DEBUG
@@ -410,9 +411,9 @@ class Iris {
 	}
 
 	/**
-	 * Checks the existance of a field or method within your script.
-	 * @param field 		The field to check if exists.
-	 */
+			 * Checks the existance of a field or method within your script.
+			 * @param field 		The field to check if exists.
+			 */
 	public function exists(field: String): Bool {
 		#if IRIS_DEBUG
 		if (interp == null)
@@ -422,11 +423,11 @@ class Iris {
 	}
 
 	/**
-	 * Destroys the current instance of this script
-	 * along with its parser, and also removes it from the `Iris.instances` map.
-	 *
-	 * **WARNING**: this action CANNOT be undone.
-	**/
+			 * Destroys the current instance of this script
+			 * along with its parser, and also removes it from the `Iris.instances` map.
+			 *
+			 * **WARNING**: this action CANNOT be undone.
+			**/
 	public function destroy(): Void {
 		if (Iris.instances.exists(this.name))
 			Iris.instances.remove(this.name);
@@ -435,10 +436,10 @@ class Iris {
 	}
 
 	/**
-	 * Destroys every single script found within the `Iris.instances` map.
-	 *
-	 * **WARNING**: this action CANNOT be undone.
-	**/
+			 * Destroys every single script found within the `Iris.instances` map.
+			 *
+			 * **WARNING**: this action CANNOT be undone.
+			**/
 	public static function destroyAll(): Void {
 		for (key in Iris.instances.keys()) {
 			var iris = Iris.instances.get(key);
