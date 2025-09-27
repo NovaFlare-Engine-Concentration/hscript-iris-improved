@@ -89,7 +89,7 @@ class ScriptedModuleNotify {
 
 					final saved = _forceClassPath.length;
 					final check = (_forceDisplayClassPath != null ? _forceDisplayClassPath : _forceClassPath);
-					final origin = "(" + check + ")" + path.replace(_forceClassPath, "src/");
+					final origin = "[[" + check + "]]" + path.replace(_forceClassPath, "src/");
 					var rp = if(saved < path.lastIndexOf("/")) path.substring(saved, path.lastIndexOf("/")).replace("/", ".") else "";
 
 					final p = parse(path, origin, rp);

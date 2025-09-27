@@ -696,6 +696,8 @@ class Interp {
 					return variables.get(id);
 				return convertDouble(resolve(id));
 			case EVar(n, de, _, v, getter, setter, isConst, ass):
+				final me:Interp = this;
+
 				if (getter == null)
 					getter = "default";
 				if (setter == null)
@@ -709,7 +711,7 @@ class Interp {
 						default:
 							error(ECustom("Inline variable initialization must be a constant value"));
 					}
-				}
+			}
 				if (ass != null && ass.contains("static")) {
 					if (staticVariables.get(n) == null) {
 						if (isConst)
@@ -731,13 +733,13 @@ class Interp {
 									if (staticVariables.get(n) != null)
 										return staticVariables.get(n).value;
 									else
-										throw error(EUnknownVariable(n));
+										throw me.error(EUnknownVariable(n));
 									return null;
 								}, (val) -> {
 									if (staticVariables.get(n) != null)
 										staticVariables.get(n).value = val;
 									else
-										throw error(EUnknownVariable(n));
+										throw me.error(EUnknownVariable(n));
 									return val;
 								}, getter, setter, true));
 							}
@@ -756,13 +758,13 @@ class Interp {
 							if (directorFields.get(n) != null)
 								return directorFields.get(n).value;
 							else
-								throw error(EUnknownVariable(n));
+								throw me.error(EUnknownVariable(n));
 							return null;
 						}, (val) -> {
 							if (directorFields.get(n) != null)
 								directorFields.get(n).value = val;
 							else
-								throw error(EUnknownVariable(n));
+								throw me.error(EUnknownVariable(n));
 							return val;
 						}, getter, setter));
 					} else {
