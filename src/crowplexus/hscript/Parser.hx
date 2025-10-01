@@ -366,7 +366,7 @@ class Parser {
 		if (e == null)
 			return false;
 		return switch (expr(e)) {
-			case EBlock(_), EObject(_), ESwitch(_), EEnum(_, _), EClass(_, _, _, _): true;
+			case EBlock(_), EObject(_), ESwitch(_), EEnum(_, _), EClass(_, _, _, _), ETypedef(_, _): true;
 			case EFunction(_, e, _, _, _): isBlock(e);
 			case EVar(_, _, t, e, _): e != null ? isBlock(e) : t != null ? t.match(CTAnon(_)) : false;
 			case EIf(_, e1, e2): if (e2 != null) isBlock(e2) else isBlock(e1);
@@ -809,11 +809,12 @@ class Parser {
 							case TPOpen:
 								break;
 							case _:
-								unexpected(t);
+								error(ECustom("expected token near '" + tokenString(t) + "' -> '('"), tokenMin, tokenMax);
 								break;
 						}
 					}
 					var name = pkg.pop();
+					if(!Tools.uppercased(name)) error(ECustom('Type Name "' + name + '" Initial capital letters are required'), tokenMin, tokenMax);
 					tp = {
 						pack: pkg,
 						name: name,
@@ -964,14 +965,18 @@ class Parser {
 				if (abductCount > 0)
 					unexpected(TId(id));
 
-				var className: String = '';
-				var extendedClassName: Null<String> = null;
-				var interfacesNames: Array<String> = [];
+				var className: String = null;
+				var extendedClassName: Null<TypePath> = null;
+				var interfacesNames: Array<TypePath> = [];
+				var tParams:Array<TypeParam> = [];
 				var t = token();
 
 				switch (t) {
 					case TId(id):
-						if (Tools.uppercased(id)) className = id; else error(ECustom('Class Name "' + id + '" Initial capital letters are required'),
+						if (Tools.uppercased(id)) {
+							className = id;
+							tParams = parseParams();
+						} else error(ECustom('Type Name "' + id + '" Initial capital letters are required'),
 							tokenMin, tokenMax);
 					case _:
 						unexpected(t);
@@ -981,8 +986,39 @@ class Parser {
 					t = token();
 					switch (t) {
 						case TId(id):
-							if (Tools.uppercased(id)) extendedClassName = id; else error(ECustom('Extended Class Name "' + id
-								+ '" Initial capital letters are required'), tokenMin, tokenMax);
+							extendedClassName = if(allowTypes) {
+								push(t);
+								switch(parseType()) {
+									case CTPath(p): p;
+									case _:
+										error(ECustom("Invalid Type For Extended Class."), tokenMin, tokenMax);
+										null;
+								}
+							} else {
+								var pkg: Array<String> = [];
+								pkg.push(id);
+								while (true) {
+									var t = token();
+									switch (t) {
+										case TDot:
+											pkg.push(getIdent());
+										case TBrOpen, TId("implements"):
+											push(t);
+											break;
+										case _:
+											error(ECustom("expected token near '" + tokenString(t) + "' -> 'implements' or '{'"), tokenMin, tokenMax);
+											break;
+									}
+								}
+								var name = pkg.pop();
+								if(!Tools.uppercased(name)) error(ECustom('Type Name "' + name + '" Initial capital letters are required'), tokenMin, tokenMax);
+								{
+									pack: pkg,
+									name: name,
+									params: [],
+									sub: null,
+								};
+							}
 						case _:
 							unexpected(t);
 					}
@@ -993,12 +1029,38 @@ class Parser {
 					var tk = token();
 					switch (tk) {
 						case TId(id):
-							if (Tools.uppercased(id)) {
-								if (!interfacesNames.contains(id))
-									interfacesNames.push(id);
-								else
-									error(ECustom('Cannot reuse an interface "' + id + '"'), tokenMin, tokenMax);
-							} else error(ECustom('Interface Name "' + id + '" Initial capital letters are required'), tokenMin, tokenMax);
+							interfacesNames.push(if(allowTypes) {
+								push(tk);
+								switch(parseType()) {
+									case CTPath(p): p;
+									case _:
+										error(ECustom("Invalid Type For Interface."), tokenMin, tokenMax);
+										null;
+								}
+							} else {
+								var pkg: Array<String> = [];
+								pkg.push(id);
+								while (true) {
+									var t = token();
+									switch (t) {
+										case TDot:
+											pkg.push(getIdent());
+										case TPOpen:
+											break;
+										case _:
+											error(ECustom("expected token near '" + tokenString(t) + "' -> '{'"), tokenMin, tokenMax);
+											break;
+									}
+								}
+								var name = pkg.pop();
+								if(!Tools.uppercased(name)) error(ECustom('Type Name "' + name + '" Initial capital letters are required'), tokenMin, tokenMax);
+								{
+									pack: pkg,
+									name: name,
+									params: [],
+									sub: null,
+								};
+							});
 						case _:
 							unexpected(tk);
 					}
@@ -1016,11 +1078,12 @@ class Parser {
 					push(t);
 					fields.push(parseClassField());
 				}
-				mk(EClass(className, extendedClassName, interfacesNames, fields, packageName?.split(".")));
+				mk(EClass(className, extendedClassName, interfacesNames, fields, tParams, packageName?.split(".")));
 			case "enum":
 				if (abductCount > 0)
 					unexpected(TId(id));
 				var name = getIdent();
+				if(!Tools.uppercased(name)) error(ECustom('Type Name "' + name + '" Initial capital letters are required'), tokenMin, tokenMax);
 
 				ensure(TBrOpen);
 
@@ -1095,43 +1158,13 @@ class Parser {
 				 */
 
 				var name = getIdent();
+				if(!Tools.uppercased(name)) error(ECustom('Type Name "' + name + '" Initial capital letters are required'), tokenMin, tokenMax);
 
 				ensureToken(TOp("="));
 
 				var t = parseType();
 
-				switch (t) {
-					case CTAnon(_) | CTExtend(_) | CTIntersection(_) | CTFun(_):
-						mk(EIgnore(true));
-					case CTPath(tp):
-						var path = tp.pack.concat([tp.name]);
-						var params = tp.params;
-						if (params != null && params.length > 1)
-							error(ECustom("Typedefs can't have parameters"), tokenMin, tokenMax);
-
-						if (path.length == 0)
-							error(ECustom("Typedefs can't be empty"), tokenMin, tokenMax);
-
-						{
-							var className = path.join(".");
-							var cl = Tools.getClass(className);
-							if (cl != null) {
-								return mk(EVar(name, abductCount, null, mk(EDirectValue(cl))));
-							}
-						}
-
-						var expr = mk(EIdent(path.shift()));
-						while (path.length > 0) {
-							expr = mk(EField(expr, path.shift(), false));
-						}
-
-						// todo? add import to the beginning of the file?
-						mk(EVar(name, abductCount, null, expr));
-					default:
-						error(ECustom("Typedef, unknown type " + t), tokenMin, tokenMax);
-						null;
-				}
-
+				mk(ETypedef(name, t, packageName?.split(".")));
 			case "using":
 				if (abductCount > 0)
 					unexpected(TId(id));
@@ -1572,6 +1605,7 @@ class Parser {
 				push(t);
 				var path = parsePath();
 				var name = path.pop();
+				if(!Tools.uppercased(name)) error(ECustom('Type Name "' + name + '" Initial capital letters are required'), tokenMin, tokenMax);
 				var params = null;
 				t = token();
 				switch (t) {
@@ -1796,10 +1830,35 @@ class Parser {
 		return meta;
 	}
 
-	function parseParams() {
-		if (maybe(TOp("<")))
-			error(EInvalidOp("Unsupported class type parameters"), readPos, readPos);
-		return {};
+	function parseParams(): Array<TypeParam> {
+		if (maybe(TOp("<"))) {
+			var params:Array<TypeParam> = [];
+			var getId:Bool = false;
+			while(true) {
+				var t = token();
+				switch(t) {
+					case TId(id) if(!getId):
+						final tn = id;
+						if(!Tools.uppercased(tn)) error(ECustom('Type Paramter Name "' + tn + '" Initial capital letters are required'), tokenMin, tokenMax);
+						var t:CType = null;
+						if(maybe(TDoubleDot) && allowTypes) {
+							t = parseType();
+						}
+						params.push({
+							name: tn,
+							defaultType: t
+						});
+						getId = true;
+					case TComma:
+						getId = false;
+					case TOp(">"): break;
+					case _:
+						unexpected(t);
+				}
+			}
+			return params;
+		}
+		return [];
 	}
 
 	function parseModuleDecl(): ModuleDecl {

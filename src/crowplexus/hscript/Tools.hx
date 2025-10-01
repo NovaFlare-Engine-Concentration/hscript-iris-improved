@@ -181,8 +181,9 @@ class Tools {
 	public static function getClass(name: String): Dynamic {
 		var c: Dynamic = ProxyType.resolveClass(name);
 		if (c == null) // try importing as enum
-			try
-				c = ProxyType.resolveEnum(name);
+			c = ProxyType.resolveEnum(name);
+		if(c == null)
+			c = Interp.typesAlias.get(name);
 
 		if (c == null) {
 			// lastly try removing any inner class from it
@@ -194,6 +195,7 @@ class Tools {
 				c = ProxyType.resolveClass(className);
 				if (c == null)
 					c = ProxyType.resolveEnum(className);
+				if (c == null) c = Interp.typesAlias.get(name);
 			}
 		}
 		return c;

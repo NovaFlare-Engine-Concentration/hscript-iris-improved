@@ -247,6 +247,20 @@ class Printer {
 		add("\n");
 	}
 
+	function addTypeParams(ps:Array<TypeParam>) {
+		add("<");
+		for(i=>p in ps) {
+			add(p.name);
+			if(p.defaultType != null) {
+				addType(p.defaultType);
+			}
+			if(i < ps.length - 1) {
+				add(", ");
+			}
+		}
+		add(">");
+	}
+
 	function expr(e: Expr) {
 		if (e == null) {
 			add("??NULL??");
@@ -254,19 +268,21 @@ class Printer {
 		}
 		switch (Tools.expr(e)) {
 			case EIgnore(_):
-			case EClass(a, b, c, d):
+			case EClass(a, b, c, d, ps):
 				add("class ");
 				add(a);
+				if(ps != null && ps.length > 0) {
+					addTypeParams(ps);
+				}
 				if (b != null) {
 					add(" extends ");
-					add(b);
+					typePath(b);
 				}
 				if (c != null)
 					for (i => sb in c) {
-						if (i > 0)
-							add(" ");
+						add(" ");
 						add("implements ");
-						add(sb);
+						typePath(sb);
 					}
 				add(" {");
 				if (d != null && d.length > 0) {
@@ -344,7 +360,7 @@ class Printer {
 					expr(e);
 					if (t != null) {
 						add(", ");
-						addType(t);
+						type(t);
 					}
 					add(")");
 				}
@@ -389,7 +405,7 @@ class Printer {
 					add(tabs);
 					expr(e);
 					var re = #if hscriptPos e.e #else e #end;
-					if (re.match(EClass(_, _, _, _)) || re.match(EEnum(_, _)))
+					if (re.match(ETypedef(_, _)) || re.match(EClass(_, _, _, _)) || re.match(EEnum(_, _)))
 						add("\n");
 					else
 						add(";\n");
@@ -650,8 +666,11 @@ class Printer {
 				decrementIndent();
 				add(tabs);
 				add("}");
-			case EDirectValue(value):
-				add("<Internal Value " + value + ">");
+			case ETypedef(name, t):
+				add("typedef ");
+				add(name);
+				add(" = ");
+				type(t);
 			case EUsing(name):
 				add("using ");
 				add(name);

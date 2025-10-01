@@ -75,6 +75,9 @@ class Interp {
 		return null;
 	}
 
+	public static var typesAlias: #if haxe3 Map<String,
+		Dynamic> = new Map() #else Hash<Dynamic> = new Hash() #end;
+
 	private static var scriptClasses: #if haxe3 Map<String,
 		crowplexus.hscript.scriptclass.ScriptClass> = new Map() #else Hash<crowplexus.hscript.scriptclass.ScriptClass> = new Hash() #end;
 	private static var scriptEnums: #if haxe3 Map<String,
@@ -127,6 +130,7 @@ class Interp {
 		staticVariables = #if haxe3 new Map() #else new Hash() #end;
 		scriptClasses = #if haxe3 new Map() #else new Hash() #end;
 		scriptEnums = #if haxe3 new Map() #else new Hash() #end;
+		typesAlias = #if haxe3 new Map() #else new Hash() #end;
 		unpackClassCache = #if haxe3 new Map() #else new Hash() #end;
 	}
 
@@ -625,6 +629,10 @@ class Interp {
 			}
 		}
 
+		if(imports.exists(id + "_Typedef")) {
+			var v = imports.get(id + "_Typedef");
+			return v;
+		}
 		if (imports.exists(id)) {
 			var v = imports.get(id);
 			return v;
@@ -1214,14 +1222,14 @@ class Interp {
 				return e;
 			case ECheckType(e, _):
 				return expr(e);
-			case EClass(clName, exName, imName, fields, pkg):
+			case EClass(cl, ex, im, fields, params, pkg):
 				if (!allowScriptClass) {
 					warn(ECustom("Cannot create class because it is not supported"));
 					return null;
 				}
-				var fullPath = (pkg != null && pkg.length > 0 ? pkg.join(".") + "." + clName : clName);
+				var fullPath = (pkg != null && pkg.length > 0 ? pkg.join(".") + "." + cl : cl);
 				if (!scriptClasses.exists(fullPath))
-					registerScriptClass(clName, exName, fields, metas, pkg);
+					registerScriptClass(cl, ex, fields, metas, pkg);
 			case EEnum(enumName, fields, pkg):
 				if (!this.allowScriptEnum) {
 					warn(ECustom("Cannot create enum because it is not supported"));
@@ -1230,8 +1238,14 @@ class Interp {
 				var fullPath = (pkg != null && pkg.length > 0 ? pkg.join(".") + "." + enumName : enumName);
 				if (!scriptEnums.exists(fullPath))
 					registerScriptEnum(enumName, fields, pkg);
-			case EDirectValue(value):
-				return value;
+			case ETypedef(name, t, pkg):
+				switch(t) {
+					case CTPath(p):
+						registerTypeAlias(name, p, pkg);
+
+					case _:
+				}
+				return null;
 			case EUsing(name):
 				useUsing(name);
 		}
@@ -1434,10 +1448,17 @@ class Interp {
 		return re;
 	}
 
-	function registerScriptClass(clName:String, exName:Null<String>, fields:Array<BydFieldDecl>, metas:Metadata, ?pkg:Array<String>) {
-		var cl = new crowplexus.hscript.scriptclass.ScriptClass(this, clName, exName, fields, metas, pkg);
-		scriptClasses.set(cl.fullPath, cl);
-		imports.set(clName, cl);
+	function registerTypeAlias(name:String, p:TypePath, ?pkg:Array<String>) {
+		final cn = (p.pack != null && p.pack.length > 0 ? p.pack.join(".") + "." : "") + p.name;
+		var v:Dynamic = imports.get(cn) ?? ProxyType.resolveClass(cn) ?? ProxyType.resolveEnum(cn);
+		typesAlias.set((pkg != null && pkg.length > 0 ? pkg.join(".") + "." : "") + name, v);
+		imports.set(name + "_Typedef", v);
+	}
+
+	function registerScriptClass(cl:String, ex:Null<TypePath>, fields:Array<BydFieldDecl>, metas:Metadata, ?pkg:Array<String>) {
+		var cls = new crowplexus.hscript.scriptclass.ScriptClass(this, cl, ex, fields, metas, pkg);
+		scriptClasses.set(cls.fullPath, cls);
+		imports.set(cl, cls);
 	}
 
 	function registerScriptEnum(enumName:String, fields:Array<EnumType>, ?pkg:Array<String>) {
@@ -1724,7 +1745,7 @@ class Interp {
 		if (o == null)
 			error(EInvalidAccess(f));
 		if (o is crowplexus.hscript.scriptclass.BaseScriptClass)
-			return cast(o, crowplexus.hscript.scriptclass.BaseScriptClass).sc_get(f, true, true);
+			return cast(o, crowplexus.hscript.scriptclass.BaseScriptClass).sc_get(f, #if hscriptPos curExpr, #end true);
 		/*@:privateAccess if (o is crowplexus.hscript.scriptclass.IScriptedClass)
 			return o.__sc_standClass.sc_get(f); */
 		if (o is ISharedScript)
@@ -1748,7 +1769,7 @@ class Interp {
 			error(EInvalidAccess(f));
 		@:privateAccess
 		if (o is crowplexus.hscript.scriptclass.BaseScriptClass)
-			cast(o, crowplexus.hscript.scriptclass.BaseScriptClass).sc_set(f, v);
+			cast(o, crowplexus.hscript.scriptclass.BaseScriptClass).sc_set(f, v, #if hscriptPos curExpr #end);
 		else if (o is ISharedScript)
 			cast(o, ISharedScript).hset(f, v);
 		else

@@ -4,6 +4,7 @@ import crowplexus.hscript.Expr;
 import crowplexus.hscript.Tools;
 import crowplexus.hscript.Interp;
 import crowplexus.hscript.Printer;
+import crowplexus.hscript.proxy.ProxyType;
 import crowplexus.hscript.scriptclass.*;
 import crowplexus.iris.Iris;
 
@@ -82,19 +83,19 @@ class ModuleAgency {
 
 	function addClasses(e:Expr) {
 		switch(Tools.expr(e)) {
-			case EClass(name, exn, _, _):
+			case EClass(cls, ex, _, _):
 				for(k => cl in ScriptedModuleNotify._specifyClasses) {
-					if(cl != null && exn == ScriptedModuleNotify._specifyClassNames[k]) {
+					if(cl != null && (ex != null && ex.name == ScriptedModuleNotify._specifyClassNames[k])) {
 						loadClasses.push(e);
-						_preClassesName.push(name);
+						_preClassesName.push(cls);
 						break;
 					}
 				}
-				unusedClasses.set(name, e);
-				if(pack == "") ScriptedModuleNotify.unpackUnusedClasses.set(name, {m: this, e: e});
+				unusedClasses.set(cls, e);
+				if(pack == "") ScriptedModuleNotify.unpackUnusedClasses.set(cls, {m: this, e: e});
 			case EImport(_):
 				imports.push(e);
-			case EEnum(name, _, _):
+			case EEnum(name, _, _), ETypedef(name, _):
 				unusedClasses.set(name, e);
 				if(pack == "") ScriptedModuleNotify.unpackUnusedClasses.set(name, {m: this, e: e});
 			case _:
@@ -120,7 +121,18 @@ class ModuleInterp extends Interp {
 	}
 
 	public override function execute(expr:Expr):Dynamic {
-		ModuleCheckClass.check(expr, function(id) {
+		ModuleCheckClass.check(expr, function(id, ?pack) {
+			if(pack != null && pack != "") {
+				if(ScriptedModuleNotify.classSystems.exists(pack)) {
+					for(m in ScriptedModuleNotify.classSystems.get(pack)) {
+						if(m.unusedClasses.exists(id)) {
+							m.__interp.execute(m.unusedClasses.get(id));
+							break;
+						}
+					}
+				}
+				return;
+			}
 			if(this.module.unusedClasses.exists(id)) {
 				final e = this.module.unusedClasses.get(id);
 				if(this.module._preClassesName.contains(id)) this.module.unusedClasses.remove(id);
@@ -143,18 +155,34 @@ class ModuleInterp extends Interp {
 		return super.execute(expr);
 	}
 
-	override function registerScriptClass(clName:String, exName:Null<String>, fields:Array<BydFieldDecl>, metas:Metadata, ?pkg:Array<String>) {
-		var cl = new crowplexus.hscript.scriptclass.ScriptClass(this, clName, exName, fields, metas, pkg);
-		Interp.scriptClasses.set(cl.fullPath, cl);
+	override function registerScriptClass(cl:String, ex:Null<TypePath>, fields:Array<BydFieldDecl>, metas:Metadata, ?pkg:Array<String>) {
+		var cls = new crowplexus.hscript.scriptclass.ScriptClass(this, cl, ex, fields, metas, pkg);
+		Interp.scriptClasses.set(cls.fullPath, cls);
 		if(this.module.pack == "") {
-			Interp.unpackClassCache.set(clName, cl);
+			Interp.unpackClassCache.set(cl, cls);
 		} else {
 			if(ScriptedModuleNotify.classSystems.exists(this.module.pack)) {
 				for(m in ScriptedModuleNotify.classSystems.get(this.module.pack)) {
-					m.__interp.imports.set(clName, cl);
+					m.__interp.imports.set(cl, cls);
 				}
 			}
-			this.module.classes.push(cl);
+			this.module.classes.push(cls);
+		}
+	}
+
+	override function registerTypeAlias(name:String, p:TypePath, ?pkg:Array<String>) {
+		final cn = (p.pack != null && p.pack.length > 0 ? p.pack.join(".") + "." : "") + p.name;
+		var v:Dynamic = imports.get(cn) ?? ProxyType.resolveClass(cn) ?? ProxyType.resolveEnum(cn);
+		Interp.typesAlias.set((pkg != null && pkg.length > 0 ? pkg.join(".") + "." : "") + name, v);
+		imports.set(name + "_Typedef", v);
+		if(this.module.pack == "") {
+			Interp.unpackClassCache.set(name, v);
+		} else {
+			if(ScriptedModuleNotify.classSystems.exists(this.module.pack)) {
+				for(m in ScriptedModuleNotify.classSystems.get(this.module.pack)) {
+					m.__interp.imports.set(name + "_Typedef", v);
+				}
+			}
 		}
 	}
 
@@ -214,17 +242,17 @@ class ModuleInterp extends Interp {
 class ModuleCheckClass {
 
 	static var savedId:Array<String>;
-	public static function check(e:Expr, f:String->Void) {
+	public static function check(e:Expr, f:String->?String->Void) {
 		if(e == null) return;
 		savedId = [];
 		_check(e, f);
 	}
 
-	private static function _check(e:Expr, f:String->Void) {
+	private static function _check(e:Expr, f:String->?String->Void) {
 		switch(Tools.expr(e)) {
-			case EClass(name, ex, _, fields):
-				if(!savedId.contains(ex)) f(ex);
-				savedId.push(name);
+			case EClass(cl, ex, _, fields):
+				if(ex != null && !savedId.contains(ex.name)) f(ex.name);
+				savedId.push(cl);
 				for(fu in fields) {
 					switch(fu.kind) {
 						case KVar(decl):
@@ -323,6 +351,12 @@ class ModuleCheckClass {
 				_check(e, f);
 			case ECheckType(e, _):
 				_check(e, f);
+			case ETypedef(name, t):
+				savedId.push(name);
+				switch(t) {
+					case CTPath(p): f(p.name, p.pack?.join("."));
+					case _:
+				}
 			default:
 		}
 	}

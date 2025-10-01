@@ -24,7 +24,7 @@ class ScriptClassInterp extends Interp {
 			}
 		}
 		if (o is crowplexus.hscript.scriptclass.BaseScriptClass)
-			return cast(o, crowplexus.hscript.scriptclass.BaseScriptClass).sc_get(f, true, true);
+			return cast(o, crowplexus.hscript.scriptclass.BaseScriptClass).sc_get(f, #if hscriptPos curExpr, #end true);
 		if (o is ISharedScript)
 			return cast(o, ISharedScript).hget(f #if hscriptPos, this.curExpr #end);
 		return {
@@ -63,9 +63,9 @@ class ScriptClassInterp extends Interp {
 				l.value = v;
 			}
 		} else if (scriptClass.sc_exists(name)) {
-			scriptClass.sc_set(name, v);
+			scriptClass.sc_set(name, v, #if hscriptPos curExpr #end);
 		} else if (scriptClass.urDad.sc_exists(name)) {
-			scriptClass.urDad.sc_set(name, v);
+			scriptClass.urDad.sc_set(name, v, #if hscriptPos curExpr #end);
 		}
 		/*if (directorFields.exists(name)) {
 				directorFields.set(name, v);

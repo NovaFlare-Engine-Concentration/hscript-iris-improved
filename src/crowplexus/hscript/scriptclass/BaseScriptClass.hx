@@ -1,11 +1,13 @@
 package crowplexus.hscript.scriptclass;
 
+import crowplexus.hscript.Expr;
+
 class BaseScriptClass {
-	public function sc_get(name: String, isScript:Bool = false, inClass:Bool = false): Dynamic {
+	public function sc_get(name: String, ?e:Expr, inClass:Bool = false): Dynamic {
 		return null;
 	}
 
-	public function sc_set(name: String, value: Dynamic): Void {}
+	public function sc_set(name: String, value: Dynamic, ?e:Expr): Void {}
 
 	public function sc_call(name: String, ?args: Array<Dynamic>): Dynamic {
 		return null;

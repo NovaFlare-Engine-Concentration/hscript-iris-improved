@@ -92,9 +92,9 @@ enum Expr
 	EDoWhile(cond:Expr, e:Expr);
 	EMeta(name:String, args:Array<Expr>, e:Expr);
 	ECheckType(e:Expr, t:CType);
-	EClass(className:String, exn:Null<String>, imn:Array<String>, fields:Array<BydFieldDecl>, ?pkg:Array<String>);
+	EClass(className:String, exn:Null<TypePath>, imn:Array<TypePath>, fields:Array<BydFieldDecl>, ?params:Array<TypeParam>, ?pkg:Array<String>);
 	EEnum(name:String, fields:Array<EnumType>, ?pkg:Array<String>);
-	EDirectValue(value:Dynamic);
+	ETypedef(name:String, type:CType, ?pkg:Array<String>);
 	EUsing(name:String);
 	ECast(e:Expr, shut:Bool, ?t:CType);
 }
@@ -188,7 +188,7 @@ enum ModuleDecl {
 
 typedef ModuleType = {
 	var name: String;
-	var params: {}; // TODO : not yet parsed
+	var params: Array<TypeParam>;
 	var meta: Metadata;
 	var isPrivate: Bool;
 }
@@ -244,6 +244,11 @@ typedef VarDecl = {
 	var expr: Null<Expr>;
 	var type: Null<CType>;
 	var ?isConst: Bool;
+}
+
+typedef TypeParam = {
+	var name:String;
+	var ?defaultType:CType;
 }
 
 enum EnumType {
