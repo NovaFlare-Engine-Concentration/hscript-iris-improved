@@ -28,37 +28,41 @@ import haxe.Serializer;
 import haxe.Unserializer;
 
 enum abstract BytesExpr(ByteInt) from ByteInt to ByteInt {
-	var EIdent = 0;
-	var EVar = 1;
-	var EConst = 2;
-	var EParent = 3;
-	var EBlock = 4;
-	var EField = 5;
-	var EBinop = 6;
-	var EUnop = 7;
-	var ECall = 8;
-	var EIf = 9;
-	var EWhile = 10;
-	var EFor = 11;
-	var EBreak = 12;
-	var EContinue = 13;
-	var EFunction = 14;
-	var EReturn = 15;
-	var EArray = 16;
-	var EArrayDecl = 17;
-	var ENew = 18;
-	var EThrow = 19;
-	var ETry = 20;
-	var EObject = 21;
-	var ETernary = 22;
-	var ESwitch = 23;
-	var EDoWhile = 24;
-	var EMeta = 25;
-	var ECheckType = 26;
-	var EImport = 27;
-	var EEnum = 28;
-	var EDirectValue = 29;
-	var EUsing = 30;
+	var EIgnore = 0;
+	var EConst = 1;
+	var EIdent = 2;
+	var EImport = 3;
+	var EVar = 4;
+	var EParent = 5;
+	var EBlock = 6;
+	var EField = 7;
+	var EBinop = 8;
+	var EUnop = 9;
+	var ECall = 10;
+	var EIf = 11;
+	var EWhile = 12;
+	var EFor = 13;
+	var EForGen = 14;
+	var EBreak = 15;
+	var EContinue = 16;
+	var EFunction = 17;
+	var EReturn = 18;
+	var EArray = 19;
+	var EArrayDecl = 20;
+	var ENew = 21;
+	var EThrow = 22;
+	var ETry = 23;
+	var EObject = 24;
+	var ETernary = 25;
+	var ESwitch = 26;
+	var EDoWhile = 27;
+	var EMeta = 28;
+	var ECheckType = 29;
+	var EClass = 30;
+	var EEnum = 31;
+	var ETypedef = 32;
+	var EUsing = 33;
+	var ECast = 34;
 }
 
 enum abstract BytesConst(ByteInt) from ByteInt to ByteInt {
@@ -73,6 +77,17 @@ enum abstract BytesConst(ByteInt) from ByteInt to ByteInt {
 	#end
 }
 
+enum abstract BytesCType(ByteInt) from ByteInt to ByteInt {
+	var CTPath = 0;
+	var CTFun = 1;
+	var CTAnon = 2;
+	var CTExtend = 3;
+	var CTParent = 4;
+	var CTOpt = 5;
+	var CTNamed = 6;
+	var CTIntersection = 7;
+}
+
 enum abstract BytesIntSize(ByteInt) from ByteInt to ByteInt {
 	var I8;
 	var I16;
@@ -82,9 +97,6 @@ enum abstract BytesIntSize(ByteInt) from ByteInt to ByteInt {
 	var N32;
 }
 
-/**
- * 事实是，这玩意儿已经被我玩废了:(
- */
 class Bytes {
 	var bin: haxe.io.Bytes;
 	var bout: haxe.io.BytesBuffer;
@@ -102,58 +114,6 @@ class Bytes {
 		hstrings = #if haxe3 new Map() #else new Hash() #end;
 		strings = [null];
 		nstrings = 1;
-
-		opMap = new Map();
-		opMap.set("+", 0);
-		opMap.set("-", 1);
-		opMap.set("*", 2);
-		opMap.set("/", 3);
-		opMap.set("%", 4);
-		opMap.set("&", 5);
-		opMap.set("|", 6);
-		opMap.set("^", 7);
-		opMap.set("<<", 8);
-		opMap.set(">>", 9);
-		opMap.set(">>>", 10);
-		opMap.set("==", 11);
-		opMap.set("!=", 12);
-		opMap.set(">=", 13);
-		opMap.set("<=", 14);
-		opMap.set(">", 15);
-		opMap.set("<", 16);
-		opMap.set("||", 17);
-		opMap.set("&&", 18);
-		opMap.set("=", 19);
-		opMap.set("??", 20);
-		opMap.set("...", 21);
-		// unary
-		opMap.set("!", 22);
-		opMap.set("~", 24);
-
-		for (key => value in opMap)
-			opMap.set(key, value << 1); // make place for the isAssign
-	}
-
-	function doEncodeOp(op: String) {
-		var isAssign = !opMap.exists(op) && op.charCodeAt(op.length - 1) == "=".code;
-		var _op = op;
-		if (isAssign) {
-			op = op.substr(0, op.length - 1);
-		}
-		var v = opMap.get(op);
-		if (v == null)
-			throw "Invalid operator " + _op;
-		bout.addByte(v);
-	}
-
-	function doDecodeOp(): String {
-		var v = bin.get(pin++);
-		var isAssign = (v & 1) != 0;
-		v >>= 1;
-		for (key => value in opMap)
-			if (value == v)
-				return key + (isAssign ? "=" : "");
-		throw "Invalid operator " + v;
 	}
 
 	function doEncodeString(v: String) {
@@ -218,20 +178,26 @@ class Bytes {
 					bout.addByte(CInt);
 					doEncodeInt(v);
 				}
-			case CSuper:
-				bout.addByte(CSuper);
-			case CEReg(i, opt):
-				bout.addByte(CEReg);
-				doEncodeString(i);
-				doEncodeCond(opt != null, function() {
-					doEncodeString(opt);
-				});
 			case CFloat(f):
 				bout.addByte(CFloat);
 				doEncodeString(Std.string(f));
-			case CString(s):
+			case CString(s, csgo):
 				bout.addByte(CString);
 				doEncodeString(s);
+				doEncodeBool(csgo != null);
+				if(csgo != null) {
+					doEncodeInt(csgo.length);
+					for(sm in csgo) {
+						doEncode(sm.e);
+						doEncodeInt(sm.pos);
+					}
+				}
+			case CEReg(r, opt):
+				bout.addByte(CEReg);
+				doEncodeString(r);
+				doEncodeString(opt == null ? "" : opt);
+			case CSuper:
+				bout.addByte(CSuper);
 			#if !haxe3
 			case CInt32(v):
 				bout.addByte(CInt32);
@@ -245,7 +211,8 @@ class Bytes {
 	}
 
 	function doDecodeInt() {
-		var size = cast(bin.get(pin++), BytesIntSize);
+		var ass = bin.get(pin++);
+		var size:BytesIntSize = ass;
 		var i = switch (size) {
 			case I8 | N8: bin.get(pin++);
 			case I16 | N16: bin.get(pin++) | bin.get(pin++) << 8;
@@ -275,16 +242,23 @@ class Bytes {
 			case CFloat:
 				CFloat(Std.parseFloat(doDecodeString()));
 			case CString:
-				CString(doDecodeString());
+				var con = doDecodeString();
+				var csgo:Array<{e:Expr, pos:Int}> = if(doDecodeBool()) {
+					var csgo = [];
+					for(i in 0...doDecodeInt()) {
+						var e = doDecode();
+						var pos = doDecodeInt();
+						csgo.push({e: e, pos: pos});
+					}
+					csgo;
+				} else null;
+				CString(con, csgo);
+			case CEReg:
+				var r = doDecodeString();
+				var opt = doDecodeString();
+				CEReg(r, opt == "" ? null : opt);
 			case CSuper:
 				CSuper;
-			case CEReg:
-				var r: String = doDecodeString();
-				var opt: Null<String> = null;
-				doDecodeCond(function() {
-					opt = doDecodeString();
-				});
-				CEReg(r, opt);
 			#if !haxe3
 			case CInt32:
 				var i = bin.get(pin) | (bin.get(pin + 1) << 8) | (bin.get(pin + 2) << 16);
@@ -300,10 +274,13 @@ class Bytes {
 	function doDecodeArg(): Argument {
 		var name = doDecodeString();
 		var opt = doDecodeBool();
+		var t:Null<CType> = if(doDecodeBool()) doDecodeCType() else null;
+		var value = doDecode();
 		return {
 			name: name,
 			opt: opt,
-			t: null
+			t: t,
+			value: value,
 		};
 	}
 
@@ -375,20 +352,147 @@ class Bytes {
 
 	function doEncodeArg(a: Argument) {
 		doEncodeString(a.name);
-		doEncodeBool(a.opt);
-		// doEncode(a.t);
+		doEncodeBool(a.opt == true);
+		doEncodeBool(a.t != null);
+		if(a.t != null)
+			doEncodeCType(a.t);
+		if (a.value == null)
+			bout.addByte(255);
+		else
+			doEncode(a.value);
 	}
 
-	function doEncodeCond(cond: Bool, func: Void->Void) {
-		doEncodeBool(cond);
-		if (cond)
-			func();
-	}
-
-	function doDecodeCond(func: Void->Void) {
-		if (doDecodeBool()) {
-			func();
+	function doEncodeCType(ct:CType) {
+		switch(ct) {
+			case CTPath(path):
+				bout.addByte(CTPath);
+				doEncodeTypePath(path);
+			case CTFun(args, ret):
+				bout.addByte(CTFun);
+				doEncodeInt(args.length);
+				for(a in args) {
+					doEncodeCType(a);
+				}
+				doEncodeCType(ret);
+			case CTAnon(fields):
+				bout.addByte(CTAnon);
+				doEncodeTypeFields(fields);
+			case CTExtend(t, fields):
+				bout.addByte(CTExtend);
+				doEncodeInt(t.length);
+				for(a in t) {
+					doEncodeTypePath(a);
+				}
+				doEncodeTypeFields(fields);
+			case CTParent(t):
+				bout.addByte(CTParent);
+				doEncodeCType(t);
+			case CTOpt(t):
+				bout.addByte(CTOpt);
+				doEncodeCType(t);
+			case CTNamed(n, t):
+				bout.addByte(CTNamed);
+				doEncodeString(n);
+				doEncodeCType(t);
+			case CTIntersection(types):
+				bout.addByte(CTIntersection);
+				doEncodeInt(types.length);
+				for(a in types) {
+					doEncodeCType(a);
+				}
 		}
+	}
+
+	function doEncodeTypeFields(fields:Array<{name: String, t: CType, ?meta:Metadata}>) {
+		doEncodeInt(fields.length);
+		for(f in fields) {
+			doEncodeString(f.name);
+			doEncodeCType(f.t);
+			doEncodeBool(f.meta != null);
+			if(f.meta != null) {
+				doEncodeMetadata(f.meta);
+			}
+		}
+	}
+
+	function doEncodeMetadata(meta:Metadata) {
+		doEncodeInt(meta.length);
+		for(m in meta) {
+			doEncodeString(m.name);
+			doEncodeInt(m.params.length);
+			for(p in m.params) doEncode(p);
+		}
+	}
+
+	function doEncodeTypePath(tp:TypePath) {
+		// pack
+		doEncodeInt(tp.pack.length);
+		for(p in tp.pack) doEncodeString(p);
+		// name
+		doEncodeString(tp.name);
+		// params
+		doEncodeBool(tp.params != null);
+		if(tp.params != null) {
+			doEncodeInt(tp.params.length);
+			for(p in tp.params) {
+				doEncodeCType(p);
+			}
+		}
+		// sub
+		doEncodeBool(tp.sub != null);
+		if(tp.sub != null) doEncodeString(tp.sub);
+	}
+
+	function doEncodeClassField(field:BydFieldDecl) {
+		doEncodeString(field.name);
+
+		doEncodeBool(field.meta != null);
+		if(field.meta != null) doEncodeMetadata(field.meta);
+
+		switch(field.kind) {
+			case KVar(decl):
+				bout.addByte(0);
+				doEncodeVarDecl(decl);
+			case KFunction(decl):
+				bout.addByte(1);
+				doEncodeFunctionDecl(decl);
+		}
+
+		doEncodeBool(field.access != null);
+		if(field.access != null) {
+			doEncodeInt(field.access.length);
+			for(a in field.access) {
+				bout.addByte(cast a);
+			}
+		}
+
+		doEncode(field.pos);
+	}
+
+	function doEncodeVarDecl(decl:VarDecl) {
+		doEncodeBool(decl.get != null);
+		if(decl.get != null) doEncodeString(decl.get);
+
+		doEncodeBool(decl.set != null);
+		if(decl.set != null) doEncodeString(decl.set);
+
+		if (decl.expr == null)
+			bout.addByte(255);
+		else
+			doEncode(decl.expr);
+
+		doEncodeBool(decl.type != null);
+		if(decl.type != null) doEncodeCType(decl.type);
+
+		doEncodeBool(decl.isConst == true);
+	}
+
+	function doEncodeFunctionDecl(decl:FunctionDecl) {
+		doEncodeInt(decl.args.length);
+		for(a in decl.args) doEncodeArg(a);
+		doEncode(decl.expr);
+		doEncodeBool(decl.ret != null);
+		if(decl.ret != null) doEncodeCType(decl.ret);
 	}
 
 	function doEncode(e: Expr) {
@@ -398,37 +502,43 @@ class Bytes {
 		var e = e.e;
 		#end
 		switch (e) {
-			case EIgnore(_):
+			case EIgnore(b):
+				doEncodeExprType(EIgnore);
+				doEncodeBool(b);
 			case EConst(c):
 				doEncodeExprType(EConst);
 				doEncodeConst(c);
 			case EIdent(v):
 				doEncodeExprType(EIdent);
 				doEncodeString(v);
-			case EVar(n, depth, _, e, getter, setter, c, s):
+			case EVar(n, depth, t, e, getter, setter, c, access):
 				doEncodeExprType(EVar);
 				doEncodeString(n);
 				doEncodeInt(depth);
+
+				doEncodeBool(t != null);
+				if(t != null) {
+					doEncodeCType(t);
+				}
+
 				if (e == null)
 					bout.addByte(255);
 				else
 					doEncode(e);
-
-				doEncodeCond(getter != null, function() {
+				doEncodeBool(getter != null);
+				if(getter != null) {
 					doEncodeString(getter);
-				});
-				doEncodeCond(setter != null, function() {
+				}
+				doEncodeBool(setter != null);
+				if(setter != null) {
 					doEncodeString(setter);
-				});
-				doEncodeCond(c != null, function() {
-					doEncodeBool(c);
-				});
-				doEncodeCond(s != null && s.length > 0, function() {
-					doEncodeInt(s.length);
-					for (ac in s) {
-						doEncodeString(ac);
-					}
-				});
+				}
+				doEncodeBool(c);
+				doEncodeBool(access != null);
+				if(access != null) {
+					doEncodeInt(access.length);
+					for(a in access) doEncodeString(a);
+				}
 			case EParent(e):
 				doEncodeExprType(EParent);
 				doEncode(e);
@@ -444,12 +554,12 @@ class Bytes {
 				doEncodeBool(s);
 			case EBinop(op, e1, e2):
 				doEncodeExprType(EBinop);
-				doEncodeOp(op);
+				doEncodeString(op);
 				doEncode(e1);
 				doEncode(e2);
 			case EUnop(op, prefix, e):
 				doEncodeExprType(EUnop);
-				doEncodeOp(op);
+				doEncodeString(op);
 				doEncodeBool(prefix);
 				doEncode(e);
 			case ECall(e, el):
@@ -479,26 +589,32 @@ class Bytes {
 				doEncodeString(v);
 				doEncode(it);
 				doEncode(e);
+			case EForGen(it, e):
+				doEncodeExprType(EForGen);
+				doEncode(it);
+				doEncode(e);
 			case EBreak:
 				doEncodeExprType(EBreak);
 			case EContinue:
 				doEncodeExprType(EContinue);
-			case EFunction(params, e, depth, name, _, s):
+			case EFunction(params, e, depth, name, ret, access):
 				doEncodeExprType(EFunction);
-				bout.addByte(params.length);
+				doEncodeInt(params.length);
 				for (p in params)
 					doEncodeArg(p);
 				doEncode(e);
 				doEncodeInt(depth);
-				doEncodeCond(name != null, function() {
-					doEncodeString(name);
-				});
-				doEncodeCond(s != null && s.length > 0, function() {
-					doEncodeInt(s.length);
-					for (ac in s) {
-						doEncodeString(ac);
-					}
-				});
+				doEncodeString(name == null ? "" : name);
+
+				doEncodeBool(ret != null);
+				if(ret != null) {
+					doEncodeCType(ret);
+				}
+				doEncodeBool(access != null);
+				if(access != null) {
+					doEncodeInt(access.length);
+					for(a in access) doEncodeString(a);
+				}
 			case EReturn(e):
 				doEncodeExprType(EReturn);
 				if (e == null)
@@ -516,7 +632,7 @@ class Bytes {
 					doEncode(e);
 			case ENew(cl, params):
 				doEncodeExprType(ENew);
-				doEncodeString(cl);
+				doEncodeTypePath(cl);
 				bout.addByte(params.length);
 				for (e in params)
 					doEncode(e);
@@ -560,17 +676,16 @@ class Bytes {
 			case EMeta(name, args, e):
 				doEncodeExprType(EMeta);
 				doEncodeString(name);
-				bout.addByte(args == null ? 0 : args.length + 1);
+				doEncodeInt(args == null ? 0 : args.length + 1);
 				if (args != null)
 					for (e in args)
 						doEncode(e);
 				doEncode(e);
-			case ECheckType(e, _):
+			case ECheckType(e, t):
 				doEncodeExprType(ECheckType);
 				doEncode(e);
-			case EClass(_, _, _, _):
-				// 学？学个屁！
-			case EEnum(name, fields):
+				doEncodeCType(t);
+			case EEnum(name, fields, pkg):
 				doEncodeExprType(EEnum);
 				doEncodeString(name);
 				bout.addByte(fields.length);
@@ -586,22 +701,175 @@ class Bytes {
 							for (a in args)
 								doEncodeArg(a);
 					}
-			case EDirectValue(value):
-				doEncodeExprType(EDirectValue);
-				doEncodeString(Serializer.run(value));
-			case EImport(v, as):
+
+				doEncodeBool(pkg != null);
+				if(pkg != null) {
+					doEncodeInt(pkg.length);
+					for(p in pkg) doEncodeString(p);
+				}
+			case EClass(className, exn, imn, fields, params, pkg):
+				doEncodeExprType(EClass);
+				doEncodeString(className);
+				doEncodeBool(exn != null);
+				if(exn != null) doEncodeTypePath(exn);
+				doEncodeInt(imn.length);
+				for(im in imn) doEncodeTypePath(im);
+				doEncodeInt(fields.length);
+				for(f in fields) doEncodeClassField(f);
+
+				doEncodeBool(pkg != null);
+				if(pkg != null) {
+					doEncodeInt(pkg.length);
+					for(p in pkg) doEncodeString(p);
+				}
+			case ETypedef(n, t, pkg):
+				doEncodeExprType(ETypedef);
+				doEncodeString(n);
+				doEncodeCType(t);
+				doEncodeBool(pkg != null);
+				if(pkg != null) {
+					doEncodeInt(pkg.length);
+					for(p in pkg) doEncodeString(p);
+				}
+			case EImport(v, as, star):
 				doEncodeExprType(EImport);
 				doEncodeString(v);
-				doEncodeString(as);
+				doEncodeBool(as != null);
+				if(as != null) doEncodeString(as);
+				doEncodeBool(star);
 			case EUsing(name):
 				doEncodeExprType(EUsing);
 				doEncodeString(name);
+			case ECast(e, shut, t):
+				doEncodeExprType(ECast);
+				doEncode(e);
+				doEncodeBool(shut);
+				doEncodeBool(t != null);
+				if(t != null) doEncodeCType(t);
 		}
 		// bout.addString("__||__");
 	}
 
 	function doDecodeBool(): Bool {
 		return bin.get(pin++) != 0;
+	}
+
+	function doDecodeCType(): CType {
+		var bytesType:BytesCType = bin.get(pin++);
+		return switch(bytesType) {
+			case CTPath:
+				CTPath(doDecodeTypePath());
+			case CTFun:
+				var args = [for(i in 0...doDecodeInt()) doDecodeCType()];
+				var ret = doDecodeCType();
+				CTFun(args, ret);
+			case CTAnon:
+				CTAnon(doDecodeTypeFields());
+			case CTExtend:
+				var t = [for(i in 0...doDecodeInt()) doDecodeTypePath()];
+				var fields = doDecodeTypeFields();
+				CTExtend(t, fields);
+			case CTParent:
+				CTParent(doDecodeCType());
+			case CTOpt:
+				CTOpt(doDecodeCType());
+			case CTNamed:
+				var n = doDecodeString();
+				var t = doDecodeCType();
+				CTNamed(n, t);
+			case CTIntersection:
+				CTIntersection([for(i in 0...doDecodeInt()) doDecodeCType()]);
+		}
+	}
+
+	function doDecodeTypeFields():Array<{name: String, t: CType, ?meta:Metadata}> {
+		var fields:Array<{name: String, t: CType, ?meta:Metadata}> = [];
+		for(i in 0...doDecodeInt()) {
+			var name = doDecodeString();
+			var t = doDecodeCType();
+			var meta:Metadata = if(doDecodeBool()) doDecodeMetadata() else null;
+			fields.push({
+				name: name,
+				t: t,
+				meta: meta,
+			});
+		}
+		return fields;
+	}
+
+	function doDecodeMetadata(): Metadata {
+		var meta:Metadata = [];
+		for(i in 0...doDecodeInt()) {
+			var name = doDecodeString();
+			var params = [for(p in 0...doDecodeInt()) doDecode()];
+			meta.push({
+				name: name,
+				params: params
+			});
+		}
+		return meta;
+	}
+
+	function doDecodeTypePath(): TypePath {
+		// pack
+		var pack = [for(i in 0...doDecodeInt()) doDecodeString()];
+		var name = doDecodeString();
+		var params = if(doDecodeBool()) [for(i in 0...doDecodeInt()) doDecodeCType()] else null;
+		var sub = if(doDecodeBool()) doDecodeString() else null;
+		return cast {
+			pack: pack,
+			name: name,
+			params: params,
+			sub: sub,
+		};
+	}
+
+	function doDecodeClassField():BydFieldDecl {
+		var name = doDecodeString();
+		var meta:Null<Metadata> = if(doDecodeBool()) doDecodeMetadata() else null;
+		var kind:FieldKind = switch(bin.get(pin++)) {
+			case 0:
+				KVar(doDecodeVarDecl());
+			case 1:
+				KFunction(doDecodeFunctionDecl());
+			case _:
+				throw "Invalid Field Kind";
+		};
+		var access:Null<Array<FieldAccess>> = if(doDecodeBool()) [for(i in 0...doDecodeInt()) cast bin.get(pin++)] else null;
+		var pos = doDecode();
+		return cast {
+			name: name,
+			meta: meta,
+			kind: kind,
+			access: access,
+			pos: pos,
+		};
+	}
+
+	function doDecodeVarDecl():VarDecl {
+		var getter:Null<String> = if(doDecodeBool()) doDecodeString() else null;
+		var setter:Null<String> = if(doDecodeBool()) doDecodeString() else null;
+		var expr = doDecode();
+		var type:Null<CType> = if(doDecodeBool()) doDecodeCType() else null;
+		var isConst = doDecodeBool();
+		return cast {
+			get: getter,
+			set: setter,
+			expr: expr,
+			type: type,
+			isConst: isConst,
+		};
+	}
+
+	function doDecodeFunctionDecl():FunctionDecl {
+		var args = [for(i in 0...doDecodeInt()) doDecodeArg()];
+		var expr = doDecode();
+		var ret:Null<CType> = if(doDecodeBool()) doDecodeCType() else null;
+		return cast {
+			args: args,
+			expr: expr,
+			ret: ret,
+		};
 	}
 
 	function doDecode(): Expr {
@@ -623,37 +891,24 @@ class Bytes {
 	#end
 		var type: BytesExpr = bin.get(pin++);
 		return switch (type) {
+			case EIgnore:
+				EIgnore(doDecodeBool());
 			case EConst:
 				EConst(doDecodeConst());
 			case EIdent:
 				EIdent(doDecodeString());
 			case EVar:
 				var v = doDecodeString();
-				var depth = doDecodeInt();
+				var d = doDecodeInt();
+				var t:Null<CType> = if(doDecodeBool()) doDecodeCType() else null;
 				var e = doDecode();
-				var c: Null<Bool> = null;
-				var acs: Array<String> = null;
 
-				var getter: Null<String> = null;
-				var setter: Null<String> = null;
+				var getter:Null<String> = if(doDecodeBool()) doDecodeString() else null;
+				var setter:Null<String> = if(doDecodeBool()) doDecodeString() else null;
 
-				doDecodeCond(function() {
-					getter = doDecodeString();
-				});
-				doDecodeCond(function() {
-					setter = doDecodeString();
-				});
-				doDecodeCond(function() {
-					c = doDecodeBool();
-				});
-				doDecodeCond(function() {
-					var length = doDecodeInt();
-					acs = [];
-					for (i in 0...length) {
-						acs.push(doDecodeString());
-					}
-				});
-				EVar(v, depth, e, getter, setter, c, acs);
+				var c = doDecodeBool();
+				var access:Null<Array<String>> = if(doDecodeBool()) [for(i in 0...doDecodeInt()) doDecodeString()] else null;
+				EVar(v, d, t, e, getter, setter, c, access);
 			case EParent:
 				EParent(doDecode());
 			case EBlock:
@@ -668,11 +923,12 @@ class Bytes {
 				var s = doDecodeBool();
 				EField(e, name, s);
 			case EBinop:
-				var op = doDecodeOp();
+				var op = doDecodeString();
 				var e1 = doDecode();
-				EBinop(op, e1, doDecode());
+				var e2 = doDecode();
+				EBinop(op, e1, e2);
 			case EUnop:
-				var op = doDecodeOp();
+				var op = doDecodeString();
 				var prefix = doDecodeBool();
 				EUnop(op, prefix, doDecode());
 			case ECall:
@@ -684,7 +940,8 @@ class Bytes {
 			case EIf:
 				var cond = doDecode();
 				var e1 = doDecode();
-				EIf(cond, e1, doDecode());
+				var eelse = doDecode();
+				EIf(cond, e1, eelse);
 			case EWhile:
 				var cond = doDecode();
 				EWhile(cond, doDecode());
@@ -695,29 +952,25 @@ class Bytes {
 				var v = doDecodeString();
 				var it = doDecode();
 				EFor(v, it, doDecode());
+			case EForGen:
+				var it = doDecode();
+				var e = doDecode();
+				EForGen(it, e);
 			case EBreak:
 				EBreak;
 			case EContinue:
 				EContinue;
 			case EFunction:
 				var params = new Array<Argument>();
-				var acs: Array<String> = null;
-				for (i in 0...bin.get(pin++))
+				for (i in 0...doDecodeInt())
 					params.push(doDecodeArg());
 				var e = doDecode();
 				var depth = doDecodeInt();
-				var name: Null<String> = null;
-				doDecodeCond(function() {
-					name = doDecodeString();
-				});
-				doDecodeCond(function() {
-					var length = doDecodeInt();
-					acs = [];
-					for (i in 0...length) {
-						acs.push(doDecodeString());
-					}
-				});
-				EFunction(params, e, depth, name, acs);
+				var name = doDecodeString();
+
+				var t:Null<CType> = if(doDecodeBool()) doDecodeCType() else null;
+				var access:Null<Array<String>> = if(doDecodeBool()) [for(i in 0...doDecodeInt()) doDecodeString()] else null;
+				EFunction(params, e, depth, (name == "") ? null : name, t, access);
 			case EReturn:
 				EReturn(doDecode());
 			case EArray:
@@ -730,7 +983,7 @@ class Bytes {
 					el.push(doDecode());
 				EArrayDecl(el);
 			case ENew:
-				var cl = doDecodeString();
+				var cl = doDecodeTypePath();
 				var el = new Array();
 				for (i in 0...bin.get(pin++))
 					el.push(doDecode());
@@ -777,16 +1030,11 @@ class Bytes {
 				ESwitch(e, cases, def);
 			case EMeta:
 				var name = doDecodeString();
-				var count = bin.get(pin++);
+				var count = doDecodeInt();
 				var args = count == 0 ? null : [for (i in 0...count - 1) doDecode()];
 				EMeta(name, args, doDecode());
 			case ECheckType:
-				ECheckType(doDecode(), CTPath({
-					pack: [],
-					params: null,
-					sub: null,
-					name: "Void"
-				}));
+				ECheckType(doDecode(), doDecodeCType());
 			case EEnum:
 				var name = doDecodeString();
 				var fields: Array<EnumType> = [];
@@ -805,17 +1053,34 @@ class Bytes {
 							throw "Invalid code " + bin.get(pin - 1);
 					}
 				}
-				EEnum(name, fields);
-			case EDirectValue:
-				var value = doDecodeString();
-				EDirectValue(Unserializer.run(value));
+				var pkg:Array<String> = if(doDecodeBool()) [for(i in 0...doDecodeInt()) doDecodeString()] else null;
+				EEnum(name, fields, pkg);
+			case EClass:
+				var cls = doDecodeString();
+				var exn:Null<TypePath> = if(doDecodeBool()) doDecodeTypePath() else null;
+				var imn = [for(i in 0...doDecodeInt()) doDecodeTypePath()];
+				var fields = [for(i in 0...doDecodeInt()) doDecodeClassField()];
+				var pkg:Array<String> = if(doDecodeBool()) [for(i in 0...doDecodeInt()) doDecodeString()] else null;
+				trace(pkg);
+				EClass(cls, exn, imn, fields, null, pkg);
+			case ETypedef:
+				var n = doDecodeString();
+				var t = doDecodeCType();
+				var pkg:Array<String> = if(doDecodeBool()) [for(i in 0...doDecodeInt()) doDecodeString()] else null;
+				ETypedef(n, t, pkg);
 			case EImport:
 				var v = doDecodeString();
-				var as = doDecodeString();
-				EImport(v, as);
+				var as:Null<String> = if(doDecodeBool()) doDecodeString() else null;
+				var star = doDecodeBool();
+				EImport(v, as, star);
 			case EUsing:
 				var name = doDecodeString();
 				EUsing(name);
+			case ECast:
+				var e = doDecode();
+				var shut = doDecodeBool();
+				var t:Null<CType> = (doDecodeBool() ? doDecodeCType() : null);
+				ECast(e, shut, t);
 			case 255:
 				null;
 				// default:

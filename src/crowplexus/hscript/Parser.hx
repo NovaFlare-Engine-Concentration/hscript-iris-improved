@@ -930,7 +930,7 @@ class Parser {
 				mk(ESwitch(parentExpr, cases, def), p1, tokenMax);
 			case "import":
 				var path = [getIdent()];
-				var asStr: String = null;
+				var asStr: Null<String> = null;
 				var star: Bool = false;
 
 				while (true) {

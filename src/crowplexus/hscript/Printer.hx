@@ -320,8 +320,8 @@ class Printer {
 
 									if (buf.length > old)
 										@:privateAccess {
-										var interporation = "${" + buf.toString().substr(old) + "}";
-										s = Printer.stringInsert(s, sm.pos + inPos, interporation);
+										var interporation = "$" + buf.toString().substr(old);
+										s = Printer.stringInsert(s, sm.pos + inPos, interporation).split("\n").join("");
 										inPos += interporation.length;
 										final oldBuf = buf.toString();
 										buf = new StringBuf();
@@ -639,7 +639,6 @@ class Printer {
 			case ECheckType(e, t):
 				add("(");
 				expr(e);
-				add(" : ");
 				addType(t);
 				add(")");
 			case EEnum(name, params):
