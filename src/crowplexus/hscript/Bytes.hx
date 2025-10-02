@@ -419,8 +419,11 @@ class Bytes {
 		doEncodeInt(meta.length);
 		for(m in meta) {
 			doEncodeString(m.name);
-			doEncodeInt(m.params.length);
-			for(p in m.params) doEncode(p);
+			doEncodeBool(m.params != null);
+			if(m.params != null) {
+				doEncodeInt(m.params.length);
+				for(p in m.params) doEncode(p);
+			}
 		}
 	}
 
@@ -801,7 +804,7 @@ class Bytes {
 		var meta:Metadata = [];
 		for(i in 0...doDecodeInt()) {
 			var name = doDecodeString();
-			var params = [for(p in 0...doDecodeInt()) doDecode()];
+			var params:Null<Array<Expr>> = if(doDecodeBool()) [for(p in 0...doDecodeInt()) doDecode()] else null;
 			meta.push({
 				name: name,
 				params: params
@@ -1061,7 +1064,6 @@ class Bytes {
 				var imn = [for(i in 0...doDecodeInt()) doDecodeTypePath()];
 				var fields = [for(i in 0...doDecodeInt()) doDecodeClassField()];
 				var pkg:Array<String> = if(doDecodeBool()) [for(i in 0...doDecodeInt()) doDecodeString()] else null;
-				trace(pkg);
 				EClass(cls, exn, imn, fields, null, pkg);
 			case ETypedef:
 				var n = doDecodeString();

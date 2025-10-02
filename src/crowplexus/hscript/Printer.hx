@@ -630,7 +630,7 @@ class Printer {
 							first = false
 						else
 							add(", ");
-						expr(e);
+						expr(a);
 					}
 					add(")");
 				}
