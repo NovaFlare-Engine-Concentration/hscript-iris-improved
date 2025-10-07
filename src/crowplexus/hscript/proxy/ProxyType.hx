@@ -2,7 +2,7 @@ package crowplexus.hscript.proxy;
 
 import crowplexus.hscript.scriptenum.*;
 import crowplexus.hscript.scriptclass.*;
-import psychlua.stages.modules.ScriptedModuleNotify;
+import scripts.stages.modules.ScriptedModuleNotify;
 
 // TODO: for most of these, support hscript enums
 // which don't quite work, but here we are

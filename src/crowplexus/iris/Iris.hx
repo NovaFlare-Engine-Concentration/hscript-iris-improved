@@ -8,8 +8,8 @@ import crowplexus.iris.ErrorSeverity;
 import crowplexus.iris.IrisConfig;
 import crowplexus.iris.utils.UsingEntry;
 import crowplexus.hscript.ISharedScript;
-import psychlua.stages.modules.ScriptedModuleNotify;
-import psychlua.stages.modules.ModuleAgency;
+import scripts.stages.modules.ScriptedModuleNotify;
+import scripts.stages.modules.ModuleAgency;
 
 using crowplexus.iris.utils.Ansi;
 using StringTools;
