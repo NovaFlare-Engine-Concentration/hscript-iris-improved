@@ -441,7 +441,7 @@ class Parser {
 		return parseExprNext(mk(EObject(fl), p1));
 	}
 
-	function automaticAbduct(condition: Bool, func: haxe.Constraints.Function, ?args: Array<Dynamic>) {
+	function automaticAbduct(condition: Bool, func: haxe.Constraints.Function, ?args: Array<Dynamic>):Dynamic {
 		var ttime = compatibles.length;
 		if (condition) {
 			compatibles.push(true);
@@ -1293,17 +1293,7 @@ class Parser {
 					case TId(id): name = id;
 					default: push(tk);
 				}
-				var ttime = compatibles.length;
-				if (abducts.contains(id)) {
-					compatibles.push(true);
-					abductCount++;
-				}
-				var inf = parseFunctionDecl();
-				if (abducts.contains(id)) {
-					while (compatibles.length > ttime)
-						compatibles.pop();
-					abductCount--;
-				}
+				var inf = automaticAbduct(true, parseFunctionDecl, []);
 
 				mk(EFunction(inf.args, inf.body, abductCount, name, inf.ret, if (abductCount == 0 && injectors != null) injectors else null), tokenMin,
 					pmax(inf.body));

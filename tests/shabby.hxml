@@ -1,0 +1,12 @@
+-L hscript-iris-improved
+-D hscriptPos
+-D analyzer-optimize
+-D IRIS_DEBUG
+-D STAR_CLASSES
+-dce no
+
+-cp source
+-main Main
+
+-hl out/main.c
+-cmd bash shabby.sh

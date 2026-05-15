@@ -1,2 +1,2 @@
-tests/bin/*
+tests/build.hxml
 dump/*

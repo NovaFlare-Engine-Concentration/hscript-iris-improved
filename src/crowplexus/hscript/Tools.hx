@@ -282,4 +282,23 @@ class Tools {
 		return -1;
 		#end
 	}
+
+	public static function unsafeGetProperty(o: Dynamic, f: String): Dynamic {
+		#if hl
+		if(o is Enum) return crowplexus.hscript.HlEnumVariant.get(cast o, f);
+		#end
+
+		return {
+			#if php
+			// https://github.com/HaxeFoundation/haxe/issues/4915
+			try {
+				Reflect.getProperty(o, f);
+			} catch (e:Dynamic) {
+				Reflect.field(o, f);
+			}
+			#else
+			Reflect.getProperty(o, f);
+			#end
+		};
+	}
 }

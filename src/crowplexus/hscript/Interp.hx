@@ -1324,7 +1324,7 @@ class Interp {
 						realMatch = stackPatternMatch(matched, e, casse, typeof, inArg);
 					case ECall(e, args):
 						final matchedRootEnum: Enum<Dynamic> = Type.getEnum(matched);
-						final matchedRoot: Dynamic = Reflect.getProperty(matchedRootEnum, Type.enumConstructor(matched));
+						final matchedRoot: Dynamic = Tools.unsafeGetProperty(matchedRootEnum, Type.enumConstructor(matched));
 						var matchedArgs: Array<Dynamic> = Type.enumParameters(matched) ?? [];
 
 						var ne: Dynamic = expr(e);
@@ -1725,7 +1725,9 @@ class Interp {
 				var oargs: Array<Dynamic> = ProxyType.enumParameters(matched) ?? [];
 				var e = expr(e);
 				var obj: Dynamic = ProxyReflect.getProperty(ProxyType.getEnum(matched), ProxyType.enumConstructor(matched));
-				if (Reflect.compareMethods(e, obj)) {
+				if (Reflect.compareMethods(e, obj) #if hl ||
+					(e is crowplexus.hscript.HlEnumVariant
+						&& e == obj) #end) {
 					var ids: Array<Bool> = [];
 					for (i => arg in args) {
 						switch (Tools.expr(arg)) {
@@ -1753,18 +1755,7 @@ class Interp {
 			return o.__sc_standClass.sc_get(f); */
 		if (o is ISharedScript)
 			return cast(o, ISharedScript).hget(f #if hscriptPos, this.curExpr #end);
-		return {
-			#if php
-			// https://github.com/HaxeFoundation/haxe/issues/4915
-			try {
-				Reflect.getProperty(o, f);
-			} catch (e:Dynamic) {
-				Reflect.field(o, f);
-			}
-			#else
-			Reflect.getProperty(o, f);
-			#end
-		}
+		return Tools.unsafeGetProperty(o, f);
 	}
 
 	function set(o: Dynamic, f: String, v: Dynamic): Dynamic {
@@ -1892,13 +1883,24 @@ class Interp {
 
 		return {
 			final func: Dynamic = get(o, f);
-			if (!Reflect.isFunction(func))
+			if (!Reflect.isFunction(func)) {
+				#if hl
+				if(func is crowplexus.hscript.HlEnumVariant) {
+					return cast(func, crowplexus.hscript.HlEnumVariant).create(args);
+				} else
+				#end
 				error(ECustom("Invalid Function -> '" + f + "'"));
+			}
 			call(o, func, args);
 		}
 	}
 
 	function call(o: Dynamic, f: Dynamic, args: Array<Dynamic>): Dynamic {
+		#if hl
+		if(f is crowplexus.hscript.HlEnumVariant) {
+			return cast(f, crowplexus.hscript.HlEnumVariant).create(args);
+		}
+		#end
 		return Reflect.callMethod(o, f, args);
 	}
 

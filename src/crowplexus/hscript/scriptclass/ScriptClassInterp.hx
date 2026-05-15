@@ -27,18 +27,7 @@ class ScriptClassInterp extends Interp {
 			return cast(o, crowplexus.hscript.scriptclass.BaseScriptClass).sc_get(f, #if hscriptPos curExpr, #end true);
 		if (o is ISharedScript)
 			return cast(o, ISharedScript).hget(f #if hscriptPos, this.curExpr #end);
-		return {
-			#if php
-			// https://github.com/HaxeFoundation/haxe/issues/4915
-			try {
-				Reflect.getProperty(o, f);
-			} catch (e:Dynamic) {
-				Reflect.field(o, f);
-			}
-			#else
-			Reflect.getProperty(o, f);
-			#end
-		}
+		return crowplexus.hscript.Tools.unsafeGetProperty(o, f);
 	}
 
 	override function setVar(name: String, v: Dynamic) {

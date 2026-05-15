@@ -101,7 +101,7 @@ class ProxyReflect {
 		if (o is ScriptEnum) {
 			return cast(o, ScriptEnum).sm.get(field);
 		}
-		return Reflect.getProperty(o, field);
+		return crowplexus.hscript.Tools.unsafeGetProperty(o, field);
 	}
 
 	/**

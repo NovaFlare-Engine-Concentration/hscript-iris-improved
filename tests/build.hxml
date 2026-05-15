@@ -7,5 +7,5 @@
 -cp source
 -main Main
 
--cpp export/cpp
---cmd ./export/cpp/Main
+-cpp /root/export/cpp
+--cmd /root/export/cpp/Main

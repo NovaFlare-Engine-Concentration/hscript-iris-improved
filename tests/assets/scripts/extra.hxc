@@ -38,4 +38,4 @@ for(key=>value in fruitPriceMap) {
 }
 
 var checkEnum = EnumSample.LetterD(EnumSample.LetterB(EnumSample.LetterB(1)), EnumSample.LetterC("sb", "ahhh"), EnumSample.LetterA);
-trace(checkEnum.match(EnumSample.LetterD(EnumSample.LetterB(EnumSample.LetterB(_)), EnumSample.LetterC(_, _), _)));
+trace(checkEnum.match(EnumSample.LetterD(EnumSample.LetterB(EnumSample.LetterB(_)), EnumSample.LetterC(_, _), EnumSample.LetterA)));

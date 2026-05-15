@@ -18,25 +18,39 @@ class TestingMacro {
 			}
 		}
 		var mainField: Field = Lambda.find(fields, (f) -> f.name == "main");
-		if (mainField != null && mainField.access.contains(AStatic) && mainField.kind.match(FFun(_))) {
-			switch (mainField.kind) {
-				case FFun(func):
-					var insteaded: Expr = macro {
-						$e{func.expr} ${
+		if(!access(mainField)) {
+			mainField = templateMainField();
+			fields.push(mainField);
+		}
 
-							{
-								expr: EBlock([
-									for (fn in testFields) {expr: ECall({expr: EConst(CIdent(fn)), pos: Context.currentPos()}, []), pos: Context.currentPos()}
-								]),
-								pos: Context.currentPos()
-							}
-						}
-					}
-					func.expr = insteaded;
-				default:
-			}
+		var initField: Field = Lambda.find(fields, (f) -> f.name == "init");
+		if (!access(initField)) Context.error("require static function 'init()'", Context.currentPos());
+		switch (mainField.kind) {
+			case FFun(func):
+				var insteaded: Expr = {
+					expr: EBlock((switch(initField.kind) {
+						case FFun(func): [func.expr];
+						default: [];
+					})
+						.concat([for (fn in testFields) {expr: ECall({expr: EConst(CIdent(fn)), pos: Context.currentPos()}, []), pos: Context.currentPos()}])
+						.concat([func.expr])
+					),
+					pos: Context.currentPos()
+				}
+				func.expr = insteaded;
+			default:
 		}
 		return fields;
+	}
+
+	inline static function access(f: Field): Bool {
+		return f != null && f.access.contains(AStatic) && f.kind.match(FFun(_));
+	}
+
+	inline static function templateMainField(): Field {
+		return {name: "main", access: [AStatic], pos: Context.currentPos(), kind: FFun({
+			args: [],
+		})}
 	}
 
 	static function resolveTestFunction(field: Field) {

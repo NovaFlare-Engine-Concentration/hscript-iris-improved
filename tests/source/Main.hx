@@ -94,8 +94,11 @@ class Main {
 		script.execute();
 	}
 
-	public static function main() {
-		Main.init();
+	static function main() {}
+
+	static function init() {
+		Logs.init();
+		Assets.init(haxe.io.Path.addTrailingSlash(Sys.getCwd()) + "assets", ["hxc", "hxs"]);
 		Usage.init();
 	}
 
@@ -106,8 +109,10 @@ class Main {
 		trace(IntSample);
 		trace(cast([], IMap<Dynamic, Dynamic>));
 	}
+}
 
-	static function init() {
-		Assets.init(haxe.io.Path.addTrailingSlash(Sys.getCwd()) + "assets", ["hxc", "hxs"]);
-	}
+enum STE {
+	NB;
+	UD;
+	SB(a: String, b: Int);
 }
