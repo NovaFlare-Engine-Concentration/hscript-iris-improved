@@ -17,8 +17,6 @@ class ScriptedClassMacro {
 	public static inline var SUPER_FUNCTION_PREFIX: String = "__SC_SUPER_";
 
 	static var noOverrides: Array<String>;
-	static var overrideFields: Array<ChouxiangFunction>;
-	static var constructor: ChouxiangFunction;
 
 	public static function build(): Array<Field> {
 		var cls: ClassType = Context.getLocalClass().get();
@@ -41,15 +39,19 @@ class ScriptedClassMacro {
 				}
 			}
 		}
-		var fields = [];
-		constructor = getConstructor(cls);
-		if (constructor == null)
-			throw "No constructor defined in super class.";
-		fields.push(buildConstructor(constructor));
-		overrideFields = getOverrides(cls);
+		var fields = Context.getBuildFields();
+		var declaredConstructor = Lambda.find(fields, field -> field.name == "new");
+		if (declaredConstructor == null) {
+			var constructor = getConstructor(cls);
+			if (constructor == null)
+				throw "No constructor defined in super class.";
+			declaredConstructor = buildConstructor(constructor);
+			fields.push(declaredConstructor);
+		}
+		bindConstructor(declaredConstructor);
+		var overrideFields = getOverrides(cls);
 		fields = fields.concat(buildIDKField(Context.getLocalClass(), cls.superClass));
-		fields = fields.concat(buildOverrides(overrideFields));
-		fields = fields.concat(buildSuperFunctions(overrideFields));
+		buildMethodBridges(fields, overrideFields);
 		return fields;
 	}
 
@@ -122,26 +124,28 @@ class ScriptedClassMacro {
 
 	private static function buildConstructor(con: ChouxiangFunction): Field {
 		var fnargs = [for (arg in con.args) macro $i{arg.name}];
-		var eargs: Array<FunctionArg> = [
-			{
-				name: "__sc_standClass",
-				type: toComplexType(Context.getType('crowplexus.hscript.scriptclass.ScriptClassInstance'))
-			}
-		];
-		var field: Field = {
+		return {
 			name: con.name,
 			kind: FFun({
-				args: eargs.concat([for (arg in con.args) {type: arg.ret, name: arg.name, value: arg.value}]),
-				expr: macro {
-					this.__sc_standClass = __sc_standClass;
-					this.__sc_standClass.superClass = this;
-					super($a{fnargs});
-				},
-				// params: con.typeParams
+				args: [for (arg in con.args) {type: arg.ret, name: arg.name, value: arg.value}],
+				expr: macro super($a{fnargs}),
 			}),
 			pos: Context.currentPos()
 		};
-		return field;
+	}
+
+	private static function bindConstructor(field: Field): Void {
+		var method = switch (field.kind) {
+			case FFun(method): method;
+			case _: Context.error("Expected a constructor function.", field.pos);
+		};
+		method.args.unshift({name: "__sc_standClass", type: macro : crowplexus.hscript.scriptclass.ScriptClassInstance});
+		method.expr = macro {
+			this.__sc_standClass = __sc_standClass;
+			if (__sc_standClass != null)
+				__sc_standClass.superClass = this;
+			$e{method.expr};
+		};
 	}
 
 	private static function getConstructor(cls: ClassType): ChouxiangFunction {
@@ -196,71 +200,74 @@ class ScriptedClassMacro {
 		return func;
 	}
 
-	static function buildSuperFunctions(funcs: Array<ChouxiangFunction>): Array<Field> {
-		var fields: Array<Field> = [];
-		for (fn in funcs) {
-			var fname = fn.name;
-			var fnargs = [for (arg in fn.args) macro $i{arg.name}];
-			fields.push({
-				name: SUPER_FUNCTION_PREFIX + fn.name,
-				// meta: fn.meta,
-				kind: FFun({
-					args: [for (arg in fn.args) {type: arg.ret, name: arg.name, value: arg.value}],
-					params: fn.typeParams,
-					expr: if (fn.doThisReturn) {
-						macro return super.$fname($a{fnargs});
-					} else {
-						macro super.$fname($a{fnargs});
-					}
-				}),
-				pos: Context.currentPos()
-			});
+	static function buildMethodBridges(fields: Array<Field>, methods: Array<ChouxiangFunction>): Void {
+		var declaredFields = [for (field in fields) field.name => field];
+		for (method in methods) {
+			var declared = declaredFields.get(method.name);
+			if (declared != null) {
+				if (declared.access != null && declared.access.contains(AOverride))
+					buildDeclaredOverride(fields, declared, method.doThisReturn);
+				continue;
+			}
+
+			var bridge = buildInheritedOverride(method);
+			fields.push(bridge.overrideField);
+			fields.push(bridge.superField);
 		}
-		return fields;
 	}
 
-	static function buildOverrides(funcs: Array<ChouxiangFunction>): Array<Field> {
-		var fields: Array<Field> = [];
-		for (fn in funcs) {
-			var fname = fn.name;
-			var fnargs = [for (arg in fn.args) macro $i{arg.name}];
-			fields.push({
-				name: fname,
+	static function buildDeclaredOverride(fields: Array<Field>, declared: Field, returnsValue: Bool): Void {
+		var method = switch (declared.kind) {
+			case FFun(method): method;
+			case _: return;
+		};
+		var superName = SUPER_FUNCTION_PREFIX + declared.name;
+		fields.push({
+			name: superName,
+			kind: FFun({args: method.args, params: method.params, ret: method.ret, expr: method.expr}),
+			meta: declared.meta == null ? null : declared.meta.filter(entry -> entry.name == ":access"),
+			pos: declared.pos
+		});
+		var args = [for (arg in method.args) macro $i{arg.name}];
+		method.expr = buildDispatch(declared.name, args, macro this.$superName($a{args}), returnsValue);
+	}
+
+	static function buildInheritedOverride(method: ChouxiangFunction): {overrideField: Field, superField: Field} {
+		var name = method.name;
+		var args = [for (arg in method.args) macro $i{arg.name}];
+		var parentCall = macro super.$name($a{args});
+		var parameters = [for (arg in method.args) {type: arg.ret, name: arg.name, value: arg.value}];
+		var pos = Context.currentPos();
+		return {
+			overrideField: {
+				name: name,
 				access: [AOverride],
-				// meta: fn.meta,
-				kind: FFun({
-					args: [for (arg in fn.args) {type: arg.ret, name: arg.name, value: arg.value}],
-					params: fn.typeParams,
-					expr: if (fn.doThisReturn) {
-						macro {
-							@:privateAccess
-							if (__sc_standClass != null && __sc_standClass.overrides.contains(${
-								{expr: EConst(CString(fname)), pos: Context.currentPos()}
-							})) {
-								var result: Dynamic = null;
-								scripts.stages.modules.ModuleAgency.runThrow(function() {
-									result = __sc_standClass.sc_call(${{expr: EConst(CString(fname)), pos: Context.currentPos()}}, [$a{fnargs}]);
-								});
-								return cast result;
-							} else
-								return super.$fname($a{fnargs});
-						}
-					} else {
-						macro {
-							@:privateAccess
-							if (__sc_standClass != null && __sc_standClass.overrides.contains(${
-								{expr: EConst(CString(fname)), pos: Context.currentPos()}
-							})) {
-									scripts.stages.modules.ModuleAgency.runThrow(function() {__sc_standClass.sc_call(${{expr: EConst(CString(fname)), pos: Context.currentPos()}}, [$a{fnargs}]);});
-							} else
-								super.$fname($a{fnargs});
-						}
-					}
-				}),
-				pos: Context.currentPos()
-			});
-		}
-		return fields;
+				kind: FFun({args: parameters, params: method.typeParams, expr: buildDispatch(name, args, parentCall, method.doThisReturn)}),
+				pos: pos
+			},
+			superField: {
+				name: SUPER_FUNCTION_PREFIX + name,
+				kind: FFun({args: parameters, params: method.typeParams, expr: method.doThisReturn ? macro return $e{parentCall} : parentCall}),
+				pos: pos
+			}
+		};
+	}
+
+	static function buildDispatch(name: String, args: Array<Expr>, parentCall: Expr, returnsValue: Bool): Expr {
+		var scriptCall = macro @:privateAccess __sc_standClass.sc_call($v{name}, [$a{args}]);
+		var dispatch = returnsValue ? macro {
+			var result: Dynamic = null;
+			scripts.stages.modules.ModuleAgency.runThrow(() -> result = $e{scriptCall});
+			return cast result;
+		} : macro scripts.stages.modules.ModuleAgency.runThrow(() -> { $e{scriptCall}; });
+		var fallback = returnsValue ? macro return $e{parentCall} : parentCall;
+		return macro {
+			@:privateAccess
+			if (__sc_standClass != null && __sc_standClass.overrides.contains($v{name}))
+				$e{dispatch};
+			else
+				$e{fallback};
+		};
 	}
 
 	static function convertTypeParam(tpr: TypeParameter): TypeParamDecl {

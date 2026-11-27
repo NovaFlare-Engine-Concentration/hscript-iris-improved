@@ -3,7 +3,6 @@ package crowplexus.hscript.scriptclass;
 import crowplexus.hscript.Interp;
 import crowplexus.iris.Iris;
 import crowplexus.hscript.proxy.ProxyType;
-import crowplexus.hscript.ISharedScript;
 
 @:access(crowplexus.hscript.Interp)
 class ScriptClassInterp extends Interp {
@@ -13,32 +12,6 @@ class ScriptClassInterp extends Interp {
 		super();
 		this.scriptClass = scriptClass;
 		this.variables.set("this", scriptClass);
-	}
-
-	override function get(o: Dynamic, f: String): Dynamic {
-		if (o == null)
-			error(EInvalidAccess(f));
-		if (o is IScriptedClass) {
-			if (scriptClass.superExistsFunction(f)) {
-				return Reflect.getProperty(o, crowplexus.iris.macro.ScriptedClassMacro.SUPER_FUNCTION_PREFIX + f);
-			}
-		}
-		if (o is crowplexus.hscript.scriptclass.BaseScriptClass)
-			return cast(o, crowplexus.hscript.scriptclass.BaseScriptClass).sc_get(f, #if hscriptPos curExpr, #end true);
-		if (o is ISharedScript)
-			return cast(o, ISharedScript).hget(f #if hscriptPos, this.curExpr #end);
-		return {
-			#if php
-			// https://github.com/HaxeFoundation/haxe/issues/4915
-			try {
-				Reflect.getProperty(o, f);
-			} catch (e:Dynamic) {
-				Reflect.field(o, f);
-			}
-			#else
-			Reflect.getProperty(o, f);
-			#end
-		}
 	}
 
 	override function setVar(name: String, v: Dynamic) {

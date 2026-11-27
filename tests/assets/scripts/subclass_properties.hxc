@@ -1,0 +1,67 @@
+import scripted.ScriptedBaseSample;
+
+class PropertyChild extends ScriptedBaseSample {
+	public var own:Int = 7;
+	public var doubled(get, set):Int;
+	public var active:Bool = false;
+	public var output(get, set):Int;
+
+	public function new() {
+		super();
+		this.own++;
+	}
+
+	function get_doubled() return own * 2;
+	function set_doubled(value:Int) {
+		this.own = Std.int(value / 2);
+		return value;
+	}
+	function get_output() return own;
+	function set_output(value:Int) return own = value;
+
+	public function readOther(other) return other.doubled;
+	public function describeOther(other) return other.toString();
+	public function describeParent() return super.toString();
+	public function readActive() return active;
+	override function toString() return "child " + this.own;
+}
+
+function failArgument() {
+	throw "argument failure";
+}
+
+var child = new PropertyChild();
+var items = [child];
+var record = {item: child};
+expect(child.own, 8, "child field and explicit constructor");
+expect(items[0].own, 8, "child field through an array");
+items[0].doubled = 24;
+expect(child.own, 12, "setter through an array");
+record.item.own += 3;
+expect(record.item.doubled, 30, "compound assignment and getter through a record");
+expect(hostRoundTrip(child).own, 15, "child field after a Haxe call");
+expect(hostRoundTrip(child).unknownField, null, "unknown Haxe field");
+expect(hostRoundTrip.bind(child)().own, 15, "child field after binding a Haxe argument");
+var caught = false;
+try {
+	hostRoundTrip(failArgument()).own;
+} catch (error:Dynamic) {
+	caught = error == "argument failure";
+}
+expect(caught, true, "argument error in a field receiver propagates");
+var recovered = [child];
+expect(hostArrayHasNative(recovered), true, "argument conversion resumes after a caught error");
+hostRoundTrip(child).own = 17;
+expect(child.readOther(child), 34, "child getter in another script object access");
+expect(child.describeOther(child), "child 17", "normal method dispatch through the Haxe instance");
+expect(child.describeParent(), "(active: true | exists: true)", "explicit parent method dispatch");
+expect(child.active, false, "same-named child field takes precedence");
+items[0].active = true;
+expect(child.readActive(), true, "bare and qualified access share the child field");
+expect(items[0].output, 17, "same-named child getter takes precedence");
+items[0].output = 19;
+expect(child.own, 19, "same-named child setter takes precedence");
+expect(readNativeOutput(child), null, "native host field is separate");
+items[0].exists = false;
+expect(child.exists, false, "inherited Haxe field remains writable");
+expect(new PropertyChild().own, 8, "separate subclass instance");

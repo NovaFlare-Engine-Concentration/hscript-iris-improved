@@ -28,6 +28,8 @@ import crowplexus.hscript.proxy.ProxyStd;
 import Type.ValueType;
 import crowplexus.hscript.Expr;
 import crowplexus.hscript.Tools;
+import crowplexus.hscript.scriptclass.BaseScriptClass;
+import crowplexus.hscript.scriptclass.IScriptedClass;
 import crowplexus.iris.Iris;
 import crowplexus.iris.IrisUsingClass;
 import crowplexus.iris.utils.UsingEntry;
@@ -198,14 +200,14 @@ class Interp {
 		return parentInstance = val;
 	}
 
-	var depth: Int;
+	var depth: Int = 0;
 	var inTry: Bool;
 	var declared: Array<DeclaredVar>;
 	var returnValue: Dynamic;
 
 	var inFunction: Null<String>;
 	var callTP: Bool;
-	var fieldDotRet: Array<String> = [];
+	var fieldAccessDepth: Int = 0;
 	var metas: Metadata = [];
 	var converted: Array<Dynamic> = [];
 
@@ -379,9 +381,7 @@ class Interp {
 						warn(ECustom("Cannot reassign final, for constant expression -> " + id));
 				}
 			case EField(e, f, s):
-				fieldDotRet.push(f);
-				var e = expr(e);
-				fieldDotRet.pop();
+				var e = evalAtFieldDepth(e, fieldAccessDepth + 1);
 				if (e == null)
 					if (!s)
 						error(EInvalidAccess(f));
@@ -423,9 +423,7 @@ class Interp {
 						warn(ECustom("Cannot reassign final, for constant expression -> " + id));
 				}
 			case EField(e, f, s):
-				fieldDotRet.push(f);
-				var obj = expr(e);
-				fieldDotRet.pop();
+				var obj = evalAtFieldDepth(e, fieldAccessDepth + 1);
 				if (obj == null)
 					if (!s)
 						error(EInvalidAccess(f));
@@ -477,9 +475,7 @@ class Interp {
 				}
 				return v;
 			case EField(e, f, s):
-				fieldDotRet.push(f);
-				var obj = expr(e);
-				fieldDotRet.pop();
+				var obj = evalAtFieldDepth(e, fieldAccessDepth + 1);
 				if (obj == null)
 					if (!s)
 						error(EInvalidAccess(f));
@@ -521,7 +517,7 @@ class Interp {
 	public function execute(expr: Expr): Dynamic {
 		added_value = null;
 		metas = new Metadata();
-		fieldDotRet = new Array<String>();
+		fieldAccessDepth = 0;
 		converted = new Array<Dynamic>();
 		callTP = false;
 		depth = 0;
@@ -688,7 +684,7 @@ class Interp {
 					case CEReg(i, opt):
 						new EReg(i, (opt != null ? opt : ""));
 					case CSuper:
-						if (fieldDotRet.length > 0)
+						if (fieldAccessDepth > 0)
 							error(ECustom("Normal variables cannot be accessed with 'super', use 'this' instead"));
 						else
 							error(ECustom("Cannot use super as value"));
@@ -803,16 +799,12 @@ class Interp {
 				restore(old);
 				return v;
 			case EField(e, f, true):
-				fieldDotRet.push(f);
-				var e = expr(e);
-				fieldDotRet.pop();
+				var e = evalAtFieldDepth(e, fieldAccessDepth + 1);
 				if (e == null)
 					return null;
 				return convertDouble(get(e, f));
 			case EField(e, f, false):
-				fieldDotRet.push(f);
-				var e = expr(e);
-				fieldDotRet.pop();
+				var e = evalAtFieldDepth(e, fieldAccessDepth + 1);
 				return convertDouble(get(e, f));
 			case EBinop(op, e1, e2):
 				var fop = binops.get(op);
@@ -848,17 +840,14 @@ class Interp {
 					case EField(e, f, s):
 						final sureSuper = Tools.expr(e).match(EConst(CSuper));
 						var obj: Dynamic = null;
-						if (!sureSuper) {
-							fieldDotRet.push(f);
-							obj = expr(e);
-							fieldDotRet.pop();
-						}
+						if (!sureSuper)
+							obj = evalAtFieldDepth(e, fieldAccessDepth + 1);
 						if (obj == null && !sureSuper)
 							if (!s)
 								error(EInvalidAccess(f));
 						if (sureSuper) {
 							for (p in params) {
-								args.push(expr(p));
+								args.push(evalCallArgument(p));
 							}
 							re = super_field_call(f, args);
 						} else if (f == "bind" && Reflect.isFunction(obj)) {
@@ -870,7 +859,7 @@ class Interp {
 									minParams++;
 									null;
 								} else {
-									expr(p);
+									evalCallArgument(p);
 								}
 							}
 							re = Reflect.makeVarArgs(function(params: Array<Dynamic>) {
@@ -896,17 +885,17 @@ class Interp {
 							re = doEnumMatch(obj, params[0], scripting);
 						} else {
 							for (p in params) {
-								args.push(expr(p));
+								args.push(evalCallArgument(p));
 							}
 							re = fcall(obj, f, args);
 						}
 					case EConst(CSuper):
 						for (p in params)
-							args.push(expr(p));
+							args.push(evalCallArgument(p));
 						re = super_call(args);
 					default:
 						for (p in params)
-							args.push(expr(p));
+							args.push(evalCallArgument(p));
 						re = call(null, expr(e), args);
 				}
 				callTP = false;
@@ -1154,7 +1143,7 @@ class Interp {
 			case ENew(cl, params):
 				var a = new Array();
 				for (e in params) {
-					a.push(expr(e));
+					a.push(evalCallArgument(e));
 				}
 				var re = cnew((cl.pack != null && cl.pack.length > 0 ? cl.pack.join(".") + "." : "") + cl.name, a);
 				return convertDouble(re);
@@ -1436,7 +1425,7 @@ class Interp {
 		if(Lambda.find(metas, f -> f.name == ":unpass_standard") != null)
 			return re;
 
-		if (fieldDotRet.length == 0) {
+		if (fieldAccessDepth == 0) {
 			if (re is crowplexus.hscript.scriptclass.ScriptClassInstance) {
 				var cls: crowplexus.hscript.scriptclass.ScriptClassInstance = cast(re, crowplexus.hscript.scriptclass.ScriptClassInstance);
 				if (cls.superClass != null) {
@@ -1747,10 +1736,9 @@ class Interp {
 	function get(o: Dynamic, f: String): Dynamic {
 		if (o == null)
 			error(EInvalidAccess(f));
-		if (o is crowplexus.hscript.scriptclass.BaseScriptClass)
-			return cast(o, crowplexus.hscript.scriptclass.BaseScriptClass).sc_get(f, #if hscriptPos curExpr, #end true);
-		/*@:privateAccess if (o is crowplexus.hscript.scriptclass.IScriptedClass)
-			return o.__sc_standClass.sc_get(f); */
+		var scriptObject = getScriptObject(o, f);
+		if (scriptObject != null)
+			return scriptObject.sc_get(f, #if hscriptPos curExpr #else null #end, true);
 		if (o is ISharedScript)
 			return cast(o, ISharedScript).hget(f #if hscriptPos, this.curExpr #end);
 		return {
@@ -1770,14 +1758,25 @@ class Interp {
 	function set(o: Dynamic, f: String, v: Dynamic): Dynamic {
 		if (o == null)
 			error(EInvalidAccess(f));
-		@:privateAccess
-		if (o is crowplexus.hscript.scriptclass.BaseScriptClass)
-			cast(o, crowplexus.hscript.scriptclass.BaseScriptClass).sc_set(f, v, #if hscriptPos curExpr #end);
+		var scriptObject = getScriptObject(o, f);
+		if (scriptObject != null)
+			scriptObject.sc_set(f, v #if hscriptPos, curExpr #end);
 		else if (o is ISharedScript)
 			cast(o, ISharedScript).hset(f, v);
 		else
 			Reflect.setProperty(o, f, v);
 		return v;
+	}
+
+	static function getScriptObject(value: Dynamic, field: String): BaseScriptClass {
+		if (value is BaseScriptClass)
+			return cast value;
+		if (value is IScriptedClass) {
+			var instance: BaseScriptClass = @:privateAccess value.__sc_standClass;
+			if (instance != null && instance.sc_exists(field))
+				return instance;
+		}
+		return null;
 	}
 
 	/**
@@ -1900,6 +1899,26 @@ class Interp {
 
 	function call(o: Dynamic, f: Dynamic, args: Array<Dynamic>): Dynamic {
 		return Reflect.callMethod(o, f, args);
+	}
+
+	inline function evalCallArgument(argument: Expr): Dynamic {
+		// A field on the call result does not make its arguments field receivers.
+		return evalAtFieldDepth(argument, 0);
+	}
+
+	function evalAtFieldDepth(expression: Expr, fieldDepth: Int): Dynamic {
+		var previousDepth = fieldAccessDepth;
+		if (fieldDepth == previousDepth)
+			return expr(expression);
+		fieldAccessDepth = fieldDepth;
+		try {
+			var value = expr(expression);
+			fieldAccessDepth = previousDepth;
+			return value;
+		} catch (error: Dynamic) {
+			fieldAccessDepth = previousDepth;
+			throw error;
+		}
 	}
 
 	function cnew(cl: String, args: Array<Dynamic>): Dynamic {

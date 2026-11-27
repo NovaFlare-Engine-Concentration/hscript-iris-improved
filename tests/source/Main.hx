@@ -66,6 +66,28 @@ class Main {
 		}
 	}
 
+	public static function test_subclass_properties() {
+		var script = new HScript("subclass_properties", false, true);
+		script.set("expect", expectEqual);
+		script.set("hostRoundTrip", (instance: BaseSample<Dynamic>) -> instance);
+		script.set("hostArrayHasNative", (items: Array<Dynamic>) -> Std.isOfType(items[0], BaseSample));
+		script.set("readNativeOutput", (instance: BaseSample<Dynamic>) -> instance.output);
+		@:privateAccess script.interp.execute(script.parse());
+	}
+
+	public static function test_host_subclass_members() {
+		var script = new HScript("host_subclass_members", false, true);
+		script.set("expect", expectEqual);
+		script.set("host", new OwnMembersSample(null, 3));
+		script.set("describeFromHaxe", (instance: BaseSample<Dynamic>) -> instance.toString());
+		@:privateAccess script.interp.execute(script.parse());
+	}
+
+	static function expectEqual(actual: Dynamic, expected: Dynamic, description: String) {
+		if (actual != expected)
+			throw '$description: expected $expected, got $actual';
+	}
+
 	public static function test_switch_case() {
 		var script: HScript = new HScript("switch_case", true);
 		script.set("EnumSample", samples.enums.EnumSample);

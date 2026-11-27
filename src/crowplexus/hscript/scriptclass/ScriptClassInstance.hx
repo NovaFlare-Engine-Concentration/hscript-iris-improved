@@ -51,11 +51,8 @@ class ScriptClassInstance extends BaseScriptClass {
 
 	public override function sc_get(name: String, ?e:Expr, inClass:Bool = false): Dynamic {
 		@:privateAccess {
-			if (superClass != null) {
-				if (!overrides.contains(name) && (cacheSuperFieldsName.contains(name) || cacheSuperFieldsName.contains("get_" + name))) {
-					return Reflect.getProperty(this.superClass, name);
-				}
-			}
+			if (usesSuperField(name, "get_"))
+				return Reflect.getProperty(superClass, name);
 
 			if (__interp.propertyLinks.get(name) != null) {
 				var l = __interp.propertyLinks.get(name);
@@ -83,11 +80,9 @@ class ScriptClassInstance extends BaseScriptClass {
 
 	public override function sc_set(name: String, value: Dynamic, ?e:Expr) {
 		@:privateAccess {
-			if (superClass != null) {
-				if (!overrides.contains(name) && (cacheSuperFieldsName.contains(name) || cacheSuperFieldsName.contains("set_" + name))) {
-					Reflect.setProperty(this.superClass, name, value);
-					return;
-				}
+			if (usesSuperField(name, "set_")) {
+				Reflect.setProperty(superClass, name, value);
+				return;
 			}
 
 			if (__interp.propertyLinks.get(name) != null) {
@@ -113,6 +108,14 @@ class ScriptClassInstance extends BaseScriptClass {
 			} else
 				__interp.variables.set(name, value);
 		}
+	}
+
+	function usesSuperField(name: String, accessorPrefix: String): Bool {
+		if (superClass == null || overrides.contains(name))
+			return false;
+		var field = @:privateAccess __interp.directorFields.get(name);
+		return (field == null || field.type != "var")
+			&& (cacheSuperFieldsName.contains(name) || cacheSuperFieldsName.contains(accessorPrefix + name));
 	}
 
 	public override function sc_call(name: String, ?args: Array<Dynamic>): Dynamic {

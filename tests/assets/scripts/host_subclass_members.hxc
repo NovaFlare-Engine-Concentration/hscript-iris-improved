@@ -1,0 +1,18 @@
+import scripted.OwnMembersSample;
+
+class HostPropertyChild extends OwnMembersSample {
+	override function toString() return super.toString() + " + script";
+}
+
+expect(host.own, 10, "declared Haxe field and constructor body");
+expect(host.doubled, 20, "declared Haxe getter on a standalone host");
+expect(host.toString(), "host 10", "declared Haxe override on a standalone host");
+
+var child = new HostPropertyChild(5);
+expect(child.own, 12, "declared Haxe field on the script subclass");
+expect(child.doubled, 24, "declared Haxe getter on the script subclass");
+child.doubled = 30;
+expect(child.own, 15, "declared Haxe setter on the script subclass");
+expect(child.describeOwn(), "host 15", "declared Haxe method on the script subclass");
+expect(child.toString(), "host 15 + script", "super reaches the declared Haxe override");
+expect(describeFromHaxe(child), "host 15 + script", "Haxe dispatch reaches the script override");

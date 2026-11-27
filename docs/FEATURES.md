@@ -31,6 +31,8 @@
 - [x] staticModifier
 
 - [x] Classes
+  - Script subclasses of `IScriptedClass` retain their fields, accessors, and method overrides when accessed through the Haxe instance. Properties declared by the script subclass take precedence over Haxe parent properties with the same name.
+  - Haxe classes implementing `IScriptedClass` keep their declared members and constructor body. Script `super` calls can reach a method overridden by the Haxe class.
 
 - [x] Support importing static functions of class (But its a shit.)
 
